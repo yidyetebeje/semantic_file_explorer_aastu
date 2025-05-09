@@ -1,0 +1,90 @@
+[package]
+default-run="semantic_file_explorer"
+name = "semantic_file_explorer"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "semantic_file_explorer"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "db_repair"
+path = "src/bin/db_repair.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+env_logger = "0.11"
+mockall = "0.11.4"
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = [
+    "full",
+    "fs"
+] } # Need fs, rt-multi-thread, macros
+thiserror = "1.0.58"
+futures = "0.3"
+chrono = "=0.4.39" # Pinned to avoid conflict with arrow-arith
+mime_guess = "2.0"
+env_logger = "0.11"
+
+directories-next = "2.0"
+# Add tracing if you want logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Add opener crate for opening files/folders with default app
+opener = "0.6"
+
+# Add hostname crate to get the computer name
+hostname = "0.3"
+tauri-plugin-dialog = "2"
+
+# Dependencies for Thumbnail Generation
+image = "0.25"
+ffmpeg-next = { version = "7.0", features = ["image"] } # Requires FFmpeg installed on system
+sha2 = "0.10.8" # Add this line
+lazy_static = "1.4"
+
+# Dedicated PNG decoder crate
+png = "0.17"
+
+# Dependencies for Semantic Search (Added)
+fastembed = "4.0" # For embeddings (quantization handled internally) - relies on default features
+notify = "6.1.1" # For file system watching
+pdf-extract = "0.7" # For extracting text from PDFs
+lancedb = "0.4.2" # Embedded vector database
+rayon = "1.8" # For potential parallelism
+log = "0.4.21"
+once_cell = "1.19" # For lazy static initialization
+tempfile = "3.8" # For temporary directories in tests
+futures-util = "0.3.28" # For stream handling
+walkdir = "2.4.0" # For directory traversal
+dirs = "5.0.1" # For finding user directories
+strsim = "0.10.0" # For string similarity metrics
+tantivy = "0.22" # Full-text search engine library
+directories = "5.0" # Platform-specific directory paths (supersedes directories-next)
+
+# Arrow dependencies (for LanceDB)
+arrow-array = "51.0" # Match version used by lancedb 0.6.0
+arrow-schema = "51.0" # Match version used by lancedb 0.6.0
+lance-arrow = "0.10.16" # Explicitly add version used by lancedb
+text-splitter = "0.25.1"
+lopdf = "0.36.0"
+extractous = "0.3.0"
+
+[features]
+# By default Tauri runs in production mode

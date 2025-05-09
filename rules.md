@@ -1,0 +1,5 @@
+- Plan for the tasks
+- Use Rust Best Practices
+- Don't remove codes without addressing the impact it will have on other files
+- always small change and test that
+- unit test is always prefered
