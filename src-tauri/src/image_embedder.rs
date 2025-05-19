@@ -109,7 +109,6 @@ pub fn embed_images(image_paths: &[&str]) -> Result<Vec<Embedding>, ImageEmbeddi
             }
         }
         Err(init_error) => {
-            // If initialization failed, return the stored error
             error!("Image embedding model initialization failed previously: {}", init_error);
             Err(ImageEmbeddingError::InitializationError(format!("{}", init_error)))
         }
@@ -136,16 +135,6 @@ pub fn embed_image(image_path: &str) -> Result<Embedding, ImageEmbeddingError> {
     }
 }
 
-/// Generate an embedding for a text query that's compatible with image embeddings
-/// 
-/// This is crucial for searching images with text queries, as it maps the text into
-/// the same vector space as the images using the CLIP model's text encoder.
-/// 
-/// # Arguments
-/// * `query_text` - The text query to convert to an embedding vector
-/// 
-/// # Returns
-/// * `Result<Embedding, ImageEmbeddingError>` - The text embedding in the image embedding space
 pub fn embed_text_for_image_search(query_text: &str) -> Result<Embedding, ImageEmbeddingError> {
     debug!("Generating image-compatible text embedding for query: {}", query_text);
     let model_guard = TEXT_FOR_IMAGE_MODEL.lock().map_err(|e| {

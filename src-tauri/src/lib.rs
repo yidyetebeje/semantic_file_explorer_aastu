@@ -1,28 +1,30 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use commands::fs_commands::{
-    get_documents_dir, get_downloads_dir, get_home_dir, get_movies_dir, list_directory_command,
-    open_path_command, save_custom_locations, load_custom_locations,
-    get_hostname_command
-};
 use commands::benchmark_commands::run_benchmarks;
-use commands::search_commands::{semantic_search_command, get_document_count};
-use commands::indexing_commands::{
-    index_downloads_command, run_startup_indexing, get_indexing_stats_command,
-    clear_index_command, index_folder_command, get_vector_db_stats_command
+use commands::fs_commands::{
+    get_documents_dir, get_downloads_dir, get_home_dir, get_hostname_command, get_movies_dir,
+    list_directory_command, load_custom_locations, open_path_command, save_custom_locations,
 };
-use commands::search_commands::{filename_search_command, add_file_to_index, remove_file_from_index, get_filename_index_stats, clear_filename_index, scan_directory_for_filename_index, initialize_filename_index};
+use commands::indexing_commands::{
+    clear_index_command, get_indexing_stats_command, get_vector_db_stats_command,
+    index_downloads_command, index_folder_command, run_startup_indexing,
+};
+use commands::search_commands::{
+    add_file_to_index, clear_filename_index, filename_search_command, get_filename_index_stats,
+    initialize_filename_index, remove_file_from_index, scan_directory_for_filename_index,
+};
+use commands::search_commands::{get_document_count, semantic_search_command};
+pub mod benchmark;
+pub mod chunker;
 pub mod commands;
 pub mod core;
 pub mod db;
-pub mod embedding;
-pub mod watcher;
-pub mod extractor;
 pub mod embedder;
-pub mod benchmark;
-pub mod search;
-pub mod chunker;
-pub mod repair_db;
+pub mod embedding;
+pub mod extractor;
 pub mod image_embedder;
+pub mod repair_db;
+pub mod search;
+pub mod watcher;
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -50,11 +52,11 @@ pub fn run() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             tracing::info!("Starting background indexing processes");
-            
+
             // Initialize the semantic search index
             tracing::info!("Starting Downloads folder indexing for semantic search");
-            run_startup_indexing().await;
-            
+            // run_startup_indexing().await;
+
             // Initialize the filename index with common directories
             tracing::info!("Starting filename index initialization");
             // match initialize_filename_index().await {
@@ -69,8 +71,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init());
 
     let builder = register_commands(builder);
-    
-    builder.run(tauri::generate_context!())
+
+    builder
+        .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
@@ -86,11 +89,9 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         load_custom_locations,
         save_custom_locations,
         get_hostname_command,
-        
         // Semantic search commands
         semantic_search_command,
         get_document_count,
-        
         // Filename search commands
         filename_search_command,
         add_file_to_index,
@@ -99,17 +100,14 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         clear_filename_index,
         scan_directory_for_filename_index,
         initialize_filename_index,
-        
         // Indexing commands
         index_downloads_command,
         index_folder_command,
         get_indexing_stats_command,
         clear_index_command,
         get_vector_db_stats_command,
-        
         // Benchmark commands
         run_benchmarks,
-        
         // Database repair command
         repair_database_command
     ])
