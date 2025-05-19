@@ -147,6 +147,7 @@ pub async fn multimodal_search(
         println!("Searching image content for: {}", query);
         
         let image_table = open_or_create_image_table(conn).await?;
+        
         println!("the image table connected successfully");
         match search_image_content(&image_table, query, fetch_limit, score_threshold).await {
             Ok(image_results) => {
@@ -319,10 +320,14 @@ async fn search_image_content(
 
     
     // Use the query() method with vector similarity
-    // Include all necessary columns
+    // Include all necessary columns and use column configuration to specify the vector column
     let vector_query = table
         .query()
-        .nearest_to(embedding)
+        .nearest_to(
+            // Since this is image embedding, we pass the embedding vector
+            // LanceDB should use the 'embedding' column by default since it's the only vector column
+            embedding
+        )
         .map_err(|e| DbError::from(e))?
         .select(Select::columns(&[
             "file_path", 
@@ -344,10 +349,7 @@ async fn search_image_content(
     
     // A map to track the best result for each file path
     let mut best_results: std::collections::HashMap<String, SearchResult> = std::collections::HashMap::new();
-    println!("Record batches: {:?}", record_batches);
-    // Process results
     for batch in record_batches {
-        println!("Batch: {:?}", batch);
         // Extract columns
         let files = batch.column_by_name("file_path")
             .and_then(|array| array.as_any().downcast_ref::<StringArray>())
@@ -383,10 +385,7 @@ async fn search_image_content(
             let distance = distances.value(i);
             let score = 1.0 - (distance / 2.0);
             
-            // Skip results below threshold
-            if score < 0.25 {
-                continue;
-            }
+           
             
             let file_path = files.value(i).to_string();
             let file_hash = file_hashes.value(i).to_string();
@@ -519,6 +518,7 @@ mod tests {
     #[tokio::test]
     async fn test_multimodal_search_validates_input() {
         let (conn, _test_db) = setup_test_multimodal_db().await;
+        conn.drop_db();
         
         // Empty query should return error
         let empty_result = multimodal_search(&conn, "", None, None, None).await;

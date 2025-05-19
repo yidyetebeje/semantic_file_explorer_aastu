@@ -197,40 +197,40 @@ pub async fn index_downloads_folder() -> Result<IndexingStats, String> {
                 let content_type = get_content_type(path);
                 match content_type {
                     ContentType::Text => {
-                        text_files_processed += 1;
-                        println!("text files {}", text_files_processed);
-                        println!("path {:?}", path);
+                        // text_files_processed += 1;
+                        // println!("text files {}", text_files_processed);
+                        // println!("path {:?}", path);
                         
-                        // Process text file
-                        if let Err(e) = process_text_file(path, &text_table).await {
-                            error!("Error processing text file {}: {}", path.display(), e);
-                            files_failed += 1;
-                            text_files_failed += 1;
-                            failed_files.push(path.to_string_lossy().to_string());
-                        } else {
-                            info!("Indexed text file: {}", path.display());
-                            db_inserts += 1;
-                            text_files_indexed += 1;
-                            indexed_files.push(path.to_string_lossy().to_string());
-                        }
-                    },
-                    ContentType::Image => {
-                        // image_files_processed += 1;
-                        // println!("Processing image file: {}", path.display());
-                       
-                        // println!("count: {}", image_files_processed);
-                        // // Process image file
-                        // if let Err(e) = process_image_file(path, &image_table).await {
-                        //     error!("Error processing image file {}: {}", path.display(), e);
+                        // // Process text file
+                        // if let Err(e) = process_text_file(path, &text_table).await {
+                        //     error!("Error processing text file {}: {}", path.display(), e);
                         //     files_failed += 1;
-                        //     image_files_failed += 1;
+                        //     text_files_failed += 1;
                         //     failed_files.push(path.to_string_lossy().to_string());
                         // } else {
-                        //     info!("Indexed image file: {}", path.display());
+                        //     info!("Indexed text file: {}", path.display());
                         //     db_inserts += 1;
-                        //     image_files_indexed += 1;
+                        //     text_files_indexed += 1;
                         //     indexed_files.push(path.to_string_lossy().to_string());
                         // }
+                    },
+                    ContentType::Image => {
+                        image_files_processed += 1;
+                        println!("Processing image file: {}", path.display());
+                       
+                        println!("count: {}", image_files_processed);
+                        // Process image file
+                        if let Err(e) = process_image_file(path, &image_table).await {
+                            error!("Error processing image file {}: {}", path.display(), e);
+                            files_failed += 1;
+                            image_files_failed += 1;
+                            failed_files.push(path.to_string_lossy().to_string());
+                        } else {
+                            info!("Indexed image file: {}", path.display());
+                            db_inserts += 1;
+                            image_files_indexed += 1;
+                            indexed_files.push(path.to_string_lossy().to_string());
+                        }
                     },
                     ContentType::Unsupported => {
                         debug!("Skipping unsupported file type: {}", path.display());

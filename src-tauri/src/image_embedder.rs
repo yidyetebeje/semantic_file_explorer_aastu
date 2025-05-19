@@ -10,8 +10,8 @@ use std::sync::Mutex;
 const MODEL_NAME: ImageEmbeddingModel = ImageEmbeddingModel::NomicEmbedVisionV15;
 const CACHE_DIR_NAME: &str = ".cache"; // Same cache directory as text model
 
-// Dimension of the CLIP embeddings
-const CLIP_EMBEDDING_DIM: usize = 512; // ClipVitB32 has 512 dimensions
+// Dimension of the Nomic Embed Vision v1.5 embeddings
+const NOMIC_EMBED_VISION_V15_DIM: usize = 768; // NomicEmbedVisionV15 has 768 dimensions
 
 // Define potential errors during image embedding
 #[derive(Error, Debug)]
@@ -148,20 +148,16 @@ pub fn embed_image(image_path: &str) -> Result<Embedding, ImageEmbeddingError> {
 /// * `Result<Embedding, ImageEmbeddingError>` - The text embedding in the image embedding space
 pub fn embed_text_for_image_search(query_text: &str) -> Result<Embedding, ImageEmbeddingError> {
     debug!("Generating image-compatible text embedding for query: {}", query_text);
-    println!("Generating image-compatible text embedding for query: {}", query_text);
-    // Get the text embedding model for image searches
     let model_guard = TEXT_FOR_IMAGE_MODEL.lock().map_err(|e| {
         let err_msg = format!("Failed to acquire lock on text model for image search: {}", e);
         error!("{}", err_msg);
         ImageEmbeddingError::InitializationError(err_msg)
     })?;
-    println!("Acquired lock on text model for image search");
     let model = model_guard.as_ref().map_err(|e| {
         let err_msg = format!("Text model for image search not initialized: {}", e);
         error!("{}", err_msg);
         ImageEmbeddingError::InitializationError(err_msg)
     })?;
-    println!("Text model for image search initialized");
 
     
     // Generate the embedding using the text model
@@ -198,7 +194,7 @@ pub fn embed_images_test(image_paths: &[&str]) -> Result<Vec<Embedding>, ImageEm
     }
     
     info!("Generating MOCK image embeddings for {} images...", image_paths.len());
-    const MOCK_DIMENSION: usize = 512; // CLIP-ViT-B-32 dimension
+    const MOCK_DIMENSION: usize = 768; // NomicEmbedVisionV15 dimension
 
     // Create different mock embeddings for different images
     let embeddings = image_paths.iter().map(|path| {

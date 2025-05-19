@@ -16,7 +16,7 @@ use lance_arrow::FixedSizeListArrayExt;
 pub const TEXT_TABLE_NAME: &str = "documents";
 pub const IMAGE_TABLE_NAME: &str = "images";
 pub const TEXT_EMBEDDING_DIM: i32 = 384;  // BGESmallENV15 dimension
-pub const IMAGE_EMBEDDING_DIM: i32 = 512; // CLIP-ViT-B-32 dimension
+pub const IMAGE_EMBEDDING_DIM: i32 = 768; // NomicEmbedVisionV15 dimension
 
 // For backward compatibility - use existing constant names internally
 pub const TABLE_NAME: &str = TEXT_TABLE_NAME;
