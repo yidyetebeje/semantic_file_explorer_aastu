@@ -227,11 +227,102 @@ export const isLoadingAtom = atom<boolean>(false);
 // Atom to store potential errors
 export const errorAtom = atom<string | null>(null);
 
-// Derived atom to filter out hidden files/folders
+// Atom to store active folder filters
+export const folderFilterCategoriesAtom = atom<FileCategory[]>([]);
+
+// Boolean atom to track if folder filtering is active
+export const isFolderFilterActiveAtom = atom<boolean>(false);
+
+// Derived atom to filter visible files based on active filters and hidden files
 export const visibleFilesAtom = atom((get) => {
   const allFiles = get(directoryFilesAtom);
-  return allFiles.filter(file => !file.name.startsWith('.'));
+  const activeFilters = get(folderFilterCategoriesAtom);
+  const isFilterActive = get(isFolderFilterActiveAtom);
+  
+  // First filter out hidden files (always active)
+  const nonHiddenFiles = allFiles.filter(file => !file.name.startsWith('.'));
+  
+  // If folder filters are not active, return all non-hidden files
+  if (!isFilterActive || activeFilters.length === 0) {
+    return nonHiddenFiles;
+  }
+  
+  // Apply category filters to non-hidden files
+  return nonHiddenFiles.filter(file => {
+    // Directories are always shown
+    if (file.is_directory) return true;
+    
+    // For files, check if their type matches any of the active filters
+    const fileType = file.file_type.toLowerCase();
+    
+    // Match file type to categories
+    const matchesCategory = activeFilters.some(category => {
+      switch(category) {
+        case 'Document':
+          return fileType.includes('document') || 
+                 fileType.includes('pdf') || 
+                 fileType.includes('txt') || 
+                 fileType.includes('doc') || 
+                 fileType.includes('text');
+        case 'Image':
+          return fileType.includes('image') || 
+                 fileType.includes('photo') ||
+                 fileType.includes('png') ||
+                 fileType.includes('jpg') ||
+                 fileType.includes('jpeg');
+        case 'Video':
+          return fileType.includes('video') || 
+                 fileType.includes('movie');
+        case 'Audio':
+          return fileType.includes('audio') || 
+                 fileType.includes('sound') || 
+                 fileType.includes('music');
+        case 'Archive':
+          return fileType.includes('archive') || 
+                 fileType.includes('zip') || 
+                 fileType.includes('compressed');
+        case 'Code':
+          return fileType.includes('code') || 
+                 fileType.includes('source') || 
+                 fileType.includes('text');
+        case 'Other':
+          // Files that don't match any other category
+          return !fileType.includes('document') && 
+                 !fileType.includes('image') && 
+                 !fileType.includes('video') && 
+                 !fileType.includes('audio') && 
+                 !fileType.includes('archive') && 
+                 !fileType.includes('code');
+        default:
+          return false;
+      }
+    });
+    
+    return matchesCategory;
+  });
 });
+
+// Atom to apply folder filters
+export const applyFolderFiltersAtom = atom(
+  null,
+  (_get, set, categories: FileCategory[]) => {
+    if (categories.length === 0) {
+      set(isFolderFilterActiveAtom, false);
+    } else {
+      set(folderFilterCategoriesAtom, categories);
+      set(isFolderFilterActiveAtom, true);
+    }
+  }
+);
+
+// Atom to clear folder filters
+export const clearFolderFiltersAtom = atom(
+  null,
+  (_get, set) => {
+    set(folderFilterCategoriesAtom, []);
+    set(isFolderFilterActiveAtom, false);
+  }
+);
 
 // --- Navigation History State ---
 export const pathHistoryAtom = atom<string[]>([]);

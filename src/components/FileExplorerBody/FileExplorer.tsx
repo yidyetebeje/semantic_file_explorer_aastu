@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { FileInfo } from "../../types/file";
 import FileGrid from "./FileGrid";
-import { Grid, List, X } from "lucide-react";
+import FilterToggle from "./FilterToggle";
+import { Grid, List, X, Filter } from "lucide-react";
 import { openPath } from "../../services/test";
 import {
   viewModeAtom,
@@ -16,7 +17,9 @@ import {
   loadDirectoryAtom,
   visibleFilesAtom,
   navigateAtom,
-  addToRecentItemsAtom
+  addToRecentItemsAtom,
+  isFolderFilterActiveAtom,
+  folderFilterCategoriesAtom
 } from '../../store/atoms';
 
 const FileExplorer = () => {
@@ -25,6 +28,8 @@ const FileExplorer = () => {
   const [gapSize] = useAtom(gapSizeAtom);
   const [selectedFile, setSelectedFile] = useAtom(selectedFileAtom);
   const [showInspector, setShowInspector] = useAtom(showInspectorAtom);
+  const [isFilterActive] = useAtom(isFolderFilterActiveAtom);
+  const [activeFilters] = useAtom(folderFilterCategoriesAtom);
 
   const currentPath = useAtomValue(currentPathAtom);
   const files = useAtomValue(visibleFilesAtom);
@@ -91,19 +96,27 @@ const FileExplorer = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-950/30 to-gray-900 w-full">
-      <div className="flex justify-end mb-4 gap-2 pt-2 pr-2">
-        <button
-          onClick={() => setViewMode("grid")}
-          className={`p-2 rounded ${viewMode === "grid" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-300"}`}
-        >
-          <Grid size={20} />
-        </button>
-        <button
-          onClick={() => setViewMode("list")}
-          className={`p-2 rounded ${viewMode === "list" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-300"}`}
-        >
-          <List size={20} />
-        </button>
+      <div className="flex justify-between items-center mb-4 gap-2 pt-2 px-2">
+        {/* Left side: Filter toggle */}
+        {!isLoading && !error && (
+          <FilterToggle />
+        )}
+        
+        {/* Right side: View mode toggles */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-2 rounded ${viewMode === "grid" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-300"}`}
+          >
+            <Grid size={20} />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-2 rounded ${viewMode === "list" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-300"}`}
+          >
+            <List size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="fixed top-0 left-0 right-0 z-10 ">
@@ -166,20 +179,45 @@ const FileExplorer = () => {
       <div className="pt-16 px-4 pb-4">
         {isLoading && <p className="text-center text-gray-400">Loading...</p>}
         {error && <p className="text-center text-red-500">Error: {error}</p>}
+        
         {!isLoading && !error && (
-          <FileGrid
-            files={files}
-            viewMode={viewMode}
-            fileSize={fileSize}
-            gapSize={gapSize}
-            onFileSelect={handleFileSelect}
-            onFileDoubleClick={handleFileDoubleClick}
-            selectedFile={selectedFile}
-          />
+          <>
+            {/* File Results with Filter Indicators */}
+            <div className="mb-4">
+              {isFilterActive && (
+                <div className="flex items-center mb-4 px-1 py-2 bg-gray-800/30 rounded-lg border border-gray-700/30 text-sm text-gray-400">
+                  <Filter className="h-4 w-4 mr-2 text-purple-400 flex-shrink-0" />
+                  <span>Showing {files.length} {files.length === 1 ? 'item' : 'items'} matching </span>
+                  <span className="font-medium text-purple-400 mx-1">{activeFilters.join(', ')}</span>
+                  <span>filter{activeFilters.length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+              
+              <FileGrid
+                files={files}
+                viewMode={viewMode}
+                fileSize={fileSize}
+                gapSize={gapSize}
+                onFileSelect={handleFileSelect}
+                onFileDoubleClick={handleFileDoubleClick}
+                selectedFile={selectedFile}
+              />
+            </div>
+            
+            {files.length === 0 && (
+              <div className="text-center py-12 bg-gray-800/10 rounded-lg border border-gray-800/30">
+                {isFilterActive ? (
+                  <>
+                    <p className="text-gray-300 text-lg mb-2">No matching files found</p>
+                    <p className="text-gray-500">Try adjusting your filters or changing directories</p>
+                  </>
+                ) : (
+                  <p className="text-gray-500">Directory is empty or not accessible.</p>
+                )}
+              </div>
+            )}
+          </>
         )}
-         {!isLoading && !error && files.length === 0 && (
-           <p className="text-center text-gray-500">Directory is empty or not accessible.</p>
-         )}
       </div>
     </div>
   );
