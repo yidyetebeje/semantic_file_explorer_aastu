@@ -16,6 +16,8 @@ use commands::search_commands::{
     initialize_filename_index, remove_file_from_index, scan_directory_for_filename_index,
 };
 use commands::search_commands::{get_document_count, semantic_search_command};
+use commands::env_commands::get_gemini_api_key;
+use commands::chat_commands::{send_message_to_gemini, search_files, get_document_content};
 pub mod benchmark;
 pub mod chunker;
 pub mod commands;
@@ -114,6 +116,12 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         create_directory,
         get_item_info,
         // Database repair command
-        repair_database_command
+        repair_database_command,
+        // Env command
+        get_gemini_api_key,
+        // Chat commands
+        send_message_to_gemini,
+        search_files,
+        get_document_content
     ])
 }

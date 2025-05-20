@@ -24,12 +24,23 @@
         "scope": [
           "$APPCACHE/thumbnails/*"
         ]
-      }
+      },
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "domain": "localhost",
+          "windows": ["main"],
+          "enable": true,
+          "plugins": []
+        }
+      ]
     }
   },
   "plugins": {
     "fs": {
       "scope": ["$APPDATA/*"]
+    },
+    "env": {
+      "allowlist": ["GEMINI_API_KEY"]
     }
   },
   "bundle": {

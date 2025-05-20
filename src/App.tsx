@@ -11,12 +11,18 @@ import {
   loadLocationsOnInitAtom, 
   currentPathAtom
 } from "./store/atoms"; 
+import { ChatWindow } from './components/Chatbot/ChatWindow';
+import { Button } from './components/ui/button';
+import { isChatOpenAtom } from './store/chatAtoms';
+// Using MessageCircle from lucide-react as a placeholder for ChatBubbleIcon
+import { MessageCircle as ChatBubbleIcon } from 'lucide-react'; 
 
 function App() {
   const loadHomeDir = useSetAtom(loadHomeDirAtom);
   const loadLocations = useSetAtom(loadLocationsOnInitAtom);
   const [currentPath] = useAtom(currentPathAtom);
   const [currentView, setCurrentView] = useState<string>('');
+  const [isChatOpen, setIsChatOpen] = useAtom(isChatOpenAtom);
 
   useEffect(() => {
     loadHomeDir();
@@ -61,6 +67,15 @@ function App() {
       <MainLayout>
         {renderContent()}
       </MainLayout>
+      <ChatWindow />
+      <Button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className="fixed bottom-5 right-5 w-14 h-14 rounded-full shadow-lg z-50"
+        aria-label="Toggle Chat"
+        variant="default"
+      >
+        <ChatBubbleIcon className="w-6 h-6" />
+      </Button>
     </main>
   );
 }
