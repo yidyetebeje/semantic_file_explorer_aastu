@@ -4,6 +4,9 @@ use commands::fs_commands::{
     get_documents_dir, get_downloads_dir, get_home_dir, get_hostname_command, get_movies_dir,
     list_directory_command, load_custom_locations, open_path_command, save_custom_locations,
 };
+use commands::file_operations::{
+    copy_item, create_directory, delete_item, get_item_info, move_item, rename_item,
+};
 use commands::indexing_commands::{
     clear_index_command, get_indexing_stats_command, get_vector_db_stats_command,
     index_downloads_command, index_folder_command, run_startup_indexing,
@@ -108,6 +111,13 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         get_vector_db_stats_command,
         // Benchmark commands
         run_benchmarks,
+        // File operations commands
+        copy_item,
+        move_item,
+        delete_item,
+        rename_item,
+        create_directory,
+        get_item_info,
         // Database repair command
         repair_database_command
     ])

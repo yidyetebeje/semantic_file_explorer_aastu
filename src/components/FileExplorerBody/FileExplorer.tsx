@@ -62,8 +62,8 @@ const FileExplorer = () => {
     console.log("Selected:", file);
   };
 
-  const handleFileDoubleClick = async (file: FileInfo) => {
-    console.log("Double-clicked:", file);
+  const handleFileDoubleClick = async (file: FileInfo) => {    
+    // If it's a directory, navigate into it
     if (file.is_directory) {
       navigate(file.path);
       // Add directory to recent items
@@ -74,6 +74,7 @@ const FileExplorer = () => {
         fileType: 'directory'
       });
     } else {
+      // Otherwise, try to open the file with the system's default app
       try {
         await openPath(file.path);
         // Add file to recent items
@@ -87,6 +88,13 @@ const FileExplorer = () => {
         console.error("Failed to open file:", err);
       }
     }
+  };
+  
+  // Handle file operations (delete, rename, copy, move)
+  const handleFileOperation = async (type: string, file: FileInfo) => {
+    // After a file operation, refresh the current directory
+    loadDirectory();
+    setSelectedFile(null);
   };
 
   // Toggle inspector visibility
@@ -125,7 +133,7 @@ const FileExplorer = () => {
         <div className="w-full h-px bg-gray-500/20 backdrop-blur-sm"></div>
       </div>
 
-      {showInspector && selectedFile && (
+      {/* {showInspector && selectedFile && (
         <div className="fixed top-16 right-4 z-20 pt-4">
           <div className="bg-gray-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg w-64 border border-gray-700/50 relative">
             <button 
@@ -174,7 +182,7 @@ const FileExplorer = () => {
             </button>
           </div>
         </div>
-      )}
+      )} */}
 
       <div className="pt-16 px-4 pb-4">
         {isLoading && <p className="text-center text-gray-400">Loading...</p>}
@@ -200,6 +208,7 @@ const FileExplorer = () => {
                 gapSize={gapSize}
                 onFileSelect={handleFileSelect}
                 onFileDoubleClick={handleFileDoubleClick}
+                onFileOperation={handleFileOperation}
                 selectedFile={selectedFile}
               />
             </div>
