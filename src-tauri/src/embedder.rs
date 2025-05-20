@@ -6,6 +6,8 @@ use log::{error, info, debug};
 use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use crate::chunker::{chunk_text, ChunkerError};
+use crate::extractor::DetectedLanguage;
+use log::warn;
 
 const DEFAULT_MODEL_NAME: EmbeddingModel = EmbeddingModel::BGESmallENV15;
 const AMHARIC_MODEL_NAME: EmbeddingModel = EmbeddingModel::MultilingualE5Small;
@@ -21,6 +23,8 @@ pub enum EmbeddingError {
     ModelLoadError(String),
     #[error("Text chunking error: {0}")]
     ChunkingError(#[from] ChunkerError),
+    #[error("Unsupported language for embedding: {0:?}")]
+    UnsupportedLanguage(DetectedLanguage),
 }
 
 static DEFAULT_MODEL: Lazy<Result<TextEmbedding, EmbeddingError>> = Lazy::new(|| {
@@ -69,6 +73,8 @@ fn embed_with_model(
                 continue; 
             }
             let chunks = chunk_text(text_content)?;
+            println!("chunks: {}", chunks.len());
+            println!("chunks: {:?}", chunks);
             final_chunks_to_embed.extend(chunks);
         }
         if final_chunks_to_embed.is_empty() { return Ok(Vec::new()); }
@@ -94,9 +100,22 @@ fn embed_with_model(
     }
 }
 
-pub fn embed_text(content: &[String], query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
-    let prefix = if query { Some("query") } else { None }; 
-    embed_with_model(&DEFAULT_MODEL, content, query, prefix)
+pub fn embed_text(content: &[String], language: &DetectedLanguage, query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+    match language {
+        DetectedLanguage::English => {
+            debug!("Embedding English text with default model.");
+            embed_with_model(&DEFAULT_MODEL, content, query, None)
+        }
+        DetectedLanguage::Amharic => {
+            debug!("Embedding Amharic text with Amharic model.");
+            let prefix = if query { "query" } else { "passage" }; // MultilingualE5Small uses these
+            embed_with_model(&AMHARIC_MODEL, content, query, Some(prefix))
+        }
+        DetectedLanguage::Other => {
+            warn!("Unsupported language {:?} detected for embedding, defaulting to English model.", language);
+            embed_with_model(&DEFAULT_MODEL, content, query, None)
+        }
+    }
 }
 
 pub fn embed_amharic_text(content: &[String], query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {

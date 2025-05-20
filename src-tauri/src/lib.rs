@@ -57,10 +57,6 @@ pub fn run() {
 
             // Initialize the filename index with common directories
             tracing::info!("Starting filename index initialization");
-            // match initialize_filename_index().await {
-            //     Ok(stats) => tracing::info!("Filename index initialized: {:?}", stats),
-            //     Err(e) => tracing::error!("Failed to initialize filename index: {}", e),
-            // }
         });
     });
 

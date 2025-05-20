@@ -144,13 +144,14 @@ pub fn benchmark_model(
         
         // Generate embeddings for the text
         let text_chunks = vec![text];
-        let (embeddings, embed_duration) = generate_embeddings(&model, &text_chunks)?;
+        let text_strings: Vec<String> = text_chunks.iter().map(|res| res.text.clone()).collect();
+        let (embeddings, embed_duration) = generate_embeddings(&model, &text_strings)?;
         
         // Update total time
         total_embedding_time += embed_duration;
         
         // Rough token count estimation (very approximate)
-        total_tokens += text_chunks.iter().map(|s| s.split_whitespace().count()).sum::<usize>();
+        total_tokens += text_chunks.iter().map(|s| s.text.split_whitespace().count()).sum::<usize>();
         
         // Track embedding dimension
         if let Some(first_embedding) = embeddings.first() {

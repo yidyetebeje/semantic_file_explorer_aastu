@@ -231,9 +231,9 @@ pub async fn process_events(rx: Receiver<NotifyResult<Event>>, table: Arc<Table>
 
 // Helper function to handle text extraction, embedding, and DB upsert for a file
 async fn process_file_upsert(path_buf: &Path, table: &Table) -> Result<(), DbError> {
-    // Extract content returns a single String
-    let content = extract_text(path_buf)?;
-    let trimmed_content = content.trim(); // Trim whitespace
+    // Extract content returns TextExtractionResult { text: String, language: DetectedLanguage }
+    let extraction_result = extract_text(path_buf)?;
+    let trimmed_content = extraction_result.text.trim(); // Trim whitespace
 
     if trimmed_content.is_empty() { // Check trimmed content
         warn!("Extracted empty or whitespace-only content for {}, skipping upsert.", path_buf.display());
@@ -242,11 +242,12 @@ async fn process_file_upsert(path_buf: &Path, table: &Table) -> Result<(), DbErr
     
     // Hash the content
     let hash = calculate_hash(trimmed_content); // Use trimmed content for hash
-    info!("  -> Extracted text, Hash: {}", hash);
+    info!("  -> Extracted text (lang: {:?}), Hash: {}", extraction_result.language, hash);
 
     // Convert the single string to a Vec<String> for embed_text
     let content_vec = vec![trimmed_content.to_string()]; // Pass trimmed content string
-    let embedding_vec = match embed_text(&content_vec, false) {
+    // The third argument to embed_text is `query: bool`, which should be false here.
+    let embedding_vec = match embed_text(&content_vec, &extraction_result.language, false) {
         Ok(vec) => vec,
         Err(e) => {
             // Log the original embedding error and skip the file

@@ -1,8 +1,8 @@
 use crate::db::{
-    open_or_create_image_table, open_or_create_text_table, DbError,
+    connect_db, open_or_create_amharic_text_table, open_or_create_image_table, open_or_create_text_table, DbError
 };
 use crate::embedder::{embed_text, EmbeddingError};
-use crate::extractor::ContentType;
+use crate::extractor::{ContentType, DetectedLanguage}; // Added import
 use crate::image_embedder::{embed_text_for_image_search, ImageEmbeddingError};
 use arrow_array::{Array, Float32Array, StringArray, TimestampSecondArray};
 use futures_util::TryStreamExt;
@@ -11,6 +11,7 @@ use lancedb::query::{ExecutableQuery, QueryBase, Select};
 use lancedb::table::Table;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
+use whatlang::{detect, Lang};
 use std::cmp::Ordering;
 use std::sync::Arc;
 use thiserror::Error;
@@ -106,7 +107,7 @@ pub async fn multimodal_search(
     // Set search parameters
     let result_limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
     let score_threshold = min_score.unwrap_or(DEFAULT_MIN_SCORE);
-    let _content_filter = content_type.unwrap_or(SearchContentType::All);
+    let content_filter = content_type.unwrap_or(SearchContentType::All);
 
     // For tests, add debug output
     #[cfg(test)]
@@ -132,10 +133,10 @@ pub async fn multimodal_search(
         #[cfg(test)]
         println!("Searching text content for: {}", query);
 
-        let text_table = open_or_create_text_table(conn).await?;
+        
         let query = format!("{}", query);
         let text_results =
-            search_text_content(&text_table, &query, fetch_limit, score_threshold).await?;
+            search_text_content(&query, fetch_limit, score_threshold).await?;
 
         debug!("Found {} text results", text_results.len());
         #[cfg(test)]
@@ -214,14 +215,21 @@ pub async fn multimodal_search(
 
 /// Search for text content using the given query
 async fn search_text_content(
-    table: &Table,
     query: &str,
     limit: usize,
     min_score: f32,
 ) -> Result<Vec<SearchResult>, SearchError> {
+    let lang_info = detect(&query);
+    let detected_lang = match lang_info {
+        Some(info) if info.lang() == Lang::Eng => DetectedLanguage::English,
+        Some(info) if info.lang() == Lang::Amh => DetectedLanguage::Amharic,
+        _ => DetectedLanguage::Other,
+    };
+    println!("Detected language: {:?}", detected_lang);
     // Generate embedding for the query
     let query_vec = vec![query.to_string()];
-    let embeddings = embed_text(&query_vec, true)?;
+    // For search queries, assume English for now. This could be enhanced later.
+    let embeddings = embed_text(&query_vec, &detected_lang, true)?;
 
     if embeddings.is_empty() {
         return Err(SearchError::OperationFailed(
@@ -236,6 +244,14 @@ async fn search_text_content(
     let query_vec = query_embedding.clone();
 
     // Use the query() method with vector similarity
+    let conn = connect_db().await?;
+    let table = if detected_lang == DetectedLanguage::Amharic {
+        open_or_create_amharic_text_table(&conn).await?
+    } else {
+        open_or_create_text_table(&conn).await?
+    };
+    println!("table name: {}", table.name());
+    println!("table schema: {:?}", detected_lang);
     // Include all necessary columns
     let vector_query = table
         .query()
@@ -492,21 +508,13 @@ async fn search_image_content(
 
 // For backward compatibility
 pub async fn semantic_search(
-    table: Arc<Table>,
     query: &str,
     limit: Option<usize>,
     min_score: Option<f32>,
 ) -> Result<Vec<SearchResult>, SearchError> {
-    // Convert the search parameters to our new format
     let result_limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
     let score_threshold = min_score.unwrap_or(DEFAULT_MIN_SCORE);
-
-    // Call our search_text_content function with the table reference
-    // Dereference the Arc<Table> to access the Table value
-    let results = search_text_content(&*table, query, result_limit, score_threshold).await?;
-
-    // For backward compatibility, we only need to handle connection() call of Table
-    // Use get the conn from elsewhere as table.connection() appears to be unavailable
+    let results = search_text_content(query, result_limit, score_threshold).await?;
 
     Ok(results)
 }

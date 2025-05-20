@@ -6,6 +6,7 @@ use std::io::Read;
 use extractous::Extractor;
 use log::{debug, error, info, warn};
 use dotext::{Docx, MsDoc};
+use whatlang::{detect, Lang};
 use thiserror::Error;
 use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
@@ -24,6 +25,19 @@ pub enum ExtractorError {
     DocxExtractionFailed(String, String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DetectedLanguage {
+    English,
+    Amharic,
+    Other,
+}
+
+#[derive(Debug, Clone)]
+pub struct TextExtractionResult {
+    pub text: String,
+    pub language: DetectedLanguage,
+}
+
 /// Content type enum to distinguish between different file types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ContentType {
@@ -33,8 +47,8 @@ pub enum ContentType {
 }
 
 /// Lists of supported file extensions
-pub const SUPPORTED_TEXT_EXTENSIONS: &[&str] = &["pdf", "txt", "md", "docx"];
-pub const SUPPORTED_IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+pub const SUPPORTED_TEXT_EXTENSIONS: &[&str] = &["md", "pdf", "docx", "txt"];
+pub const SUPPORTED_IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 /// Determines the content type of a file based on its extension
 pub fn get_content_type(file_path: &Path) -> ContentType {
@@ -61,7 +75,7 @@ pub fn get_content_type(file_path: &Path) -> ContentType {
 ///
 /// * `Ok(String)` containing the extracted text content.
 /// * `Err(ExtractorError)` if the file is unsupported or cannot be read.
-pub fn extract_text(file_path: &Path) -> Result<String, ExtractorError> {
+pub fn extract_text(file_path: &Path) -> Result<TextExtractionResult, ExtractorError> {
     debug!("Attempting to extract text from: {}", file_path.display());
 
     let extension = file_path
@@ -75,13 +89,25 @@ pub fn extract_text(file_path: &Path) -> Result<String, ExtractorError> {
             let extractor = Extractor::new();
             // extract file with extractor
             let (content, _metadata) = extractor.extract_file_to_string(file_path.to_str().unwrap()).unwrap();
-            println!("Extracted text from PDF: {}", content);
             const MAX_TEXT_LENGTH: usize = 100000; // ~100KB limit
             if content.len() > MAX_TEXT_LENGTH {
                 warn!("PDF text too large ({}), truncating to {} chars", content.len(), MAX_TEXT_LENGTH);
-                Ok(content[0..MAX_TEXT_LENGTH].to_string())
+                let truncated_content = content[0..MAX_TEXT_LENGTH].to_string();
+                let lang_info = detect(&truncated_content);
+                let detected_lang = match lang_info {
+                    Some(info) if info.lang() == Lang::Eng => DetectedLanguage::English,
+                    Some(info) if info.lang() == Lang::Amh => DetectedLanguage::Amharic,
+                    _ => DetectedLanguage::Other,
+                };
+                Ok(TextExtractionResult { text: truncated_content, language: detected_lang })
             } else {
-                Ok(content)
+                let lang_info = detect(&content);
+                let detected_lang = match lang_info {
+                    Some(info) if info.lang() == Lang::Eng => DetectedLanguage::English,
+                    Some(info) if info.lang() == Lang::Amh => DetectedLanguage::Amharic,
+                    _ => DetectedLanguage::Other,
+                };
+                Ok(TextExtractionResult { text: content, language: detected_lang })
             }
         },
         Some("docx") => {
@@ -90,7 +116,15 @@ pub fn extract_text(file_path: &Path) -> Result<String, ExtractorError> {
                 Ok(mut docx_reader) => {
                     let mut text_content = String::new();
                     match docx_reader.read_to_string(&mut text_content) {
-                        Ok(_) => Ok(text_content),
+                        Ok(_) => {
+                            let lang_info = detect(&text_content);
+                            let detected_lang = match lang_info {
+                                Some(info) if info.lang() == Lang::Eng => DetectedLanguage::English,
+                                Some(info) if info.lang() == Lang::Amh => DetectedLanguage::Amharic,
+                                _ => DetectedLanguage::Other,
+                            };
+                            Ok(TextExtractionResult { text: text_content, language: detected_lang })
+                        },
                         Err(e) => {
                             error!("Failed to extract text from DOCX (dotext) {}: {}", file_path.display(), e);
                             // Map dotext::Error to ExtractorError. Assuming dotext::Error is std::io::Error compatible for now.
@@ -111,7 +145,15 @@ pub fn extract_text(file_path: &Path) -> Result<String, ExtractorError> {
             info!("Extracting text from {}: {}", ext_str, file_path.display());
             
             // Simple file read for text files
-            std::fs::read_to_string(file_path).map_err(|e| {
+            std::fs::read_to_string(file_path).and_then(|text_content| {
+                let lang_info = detect(&text_content);
+                let detected_lang = match lang_info {
+                    Some(info) if info.lang() == Lang::Eng => DetectedLanguage::English,
+                    Some(info) if info.lang() == Lang::Amh => DetectedLanguage::Amharic,
+                    _ => DetectedLanguage::Other,
+                };
+                Ok(TextExtractionResult { text: text_content, language: detected_lang })
+            }).map_err(|e| {
                 error!("Failed to read {} file {}: {}", ext_str, file_path.display(), e);
                 ExtractorError::IoError(file_path.display().to_string(), e)
             })
@@ -235,7 +277,7 @@ mod tests {
         writeln!(file, "{}", content).unwrap();
 
         let extracted_text = extract_text(&file_path).unwrap();
-        assert_eq!(extracted_text.trim(), content);
+        assert_eq!(extracted_text.text.trim(), content);
     }
 
      #[test]
@@ -247,7 +289,7 @@ mod tests {
         writeln!(file, "{}", content).unwrap();
 
         let extracted_text = extract_text(&file_path).unwrap();
-        assert_eq!(extracted_text.trim(), content);
+        assert_eq!(extracted_text.text.trim(), content);
     }
 
     #[test]
