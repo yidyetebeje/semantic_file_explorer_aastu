@@ -18,6 +18,9 @@ pub struct FileInfo {
     /// Optional path to a generated thumbnail in the cache directory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thumbnail_path: Option<String>,
+    /// Optional embedding for the file, if available and applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Vec<f32>>,
 }
 
 // Note: The default Ord derived above will sort primarily by `name`.

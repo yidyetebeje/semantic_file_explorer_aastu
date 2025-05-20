@@ -6,3 +6,4 @@ pub mod indexing_commands;
 pub mod file_operations;
 pub mod env_commands;
 pub mod chat_commands;
+pub mod category_commands;

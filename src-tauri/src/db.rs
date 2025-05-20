@@ -1,19 +1,20 @@
 // src-tauri/src/db.rs
 
-use arrow_array::{RecordBatch, RecordBatchIterator, StringArray, FixedSizeListArray, TimestampSecondArray, Int32Array};
+use arrow_array::{RecordBatch, RecordBatchIterator, StringArray, FixedSizeListArray, TimestampSecondArray, Int32Array, Float32Array};
 use arrow_array::builder::Float32Builder;
 use arrow_schema::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use lancedb::{connection::Connection, table::Table, Error as LanceError};
 use lancedb::query::{QueryBase, ExecutableQuery, Select};
 use futures::TryStreamExt; // For stream operations
-use std::{path::{Path, PathBuf}, sync::Arc};
+use std::{path::{Path, PathBuf}, sync::Arc, collections::HashSet};
 use std::fs;
 use tempfile::TempDir; // Add this line for temporary directory support
 use thiserror::Error;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use log::{info, warn, debug};
 
 use lance_arrow::FixedSizeListArrayExt;
+use crate::core::models::FileInfo; // Added for new function
 pub const TEXT_TABLE_NAME: &str = "documents";
 pub const IMAGE_TABLE_NAME: &str = "images";
 pub const TEXT_EMBEDDING_DIM: i32 = 384;  // BGESmallENV15 dimension
@@ -723,4 +724,98 @@ pub async fn get_vector_db_stats(conn: &Connection) -> Result<(usize, usize, usi
     
     // Return the document counts
     Ok((text_docs_count, image_docs_count, amharic_docs_count))
+}
+
+
+pub async fn get_all_indexed_files_with_embeddings(conn: &Connection) -> Result<Vec<FileInfo>, DbError> {
+    let mut all_files = Vec::new();
+
+    // Fetch from text table
+    match open_or_create_text_table(conn).await {
+        Ok(text_table) => {
+            let stream = text_table
+                .query()
+                .select(Select::columns(&["file_path", "embedding", "last_modified"])) // Assuming content_hash not directly needed for FileInfo here
+                .execute()
+                .await?;
+            
+            let batches = stream.try_collect::<Vec<_>>().await?;
+            for batch in batches {
+                let file_path_arr = batch.column_by_name("file_path").unwrap().as_any().downcast_ref::<StringArray>().unwrap();
+                let embedding_arr = batch.column_by_name("embedding").unwrap().as_any().downcast_ref::<FixedSizeListArray>().unwrap();
+                let last_modified_arr = batch.column_by_name("last_modified").unwrap().as_any().downcast_ref::<TimestampSecondArray>().unwrap();
+
+                for i in 0..batch.num_rows() {
+                    let path_str = file_path_arr.value(i).to_string();
+                    let name = PathBuf::from(&path_str).file_name().unwrap_or_default().to_string_lossy().into_owned();
+                    
+                    let embedding_values_data = embedding_arr.values(i);
+                    let embedding_values = embedding_values_data.as_any().downcast_ref::<Float32Array>().unwrap();
+                    let embedding_vec: Vec<f32> = embedding_values.values().iter().copied().collect();
+
+                    all_files.push(FileInfo {
+                        name,
+                        path: path_str,
+                        is_directory: false,
+                        size: None, 
+                        modified: Some(DateTime::from_timestamp(last_modified_arr.value(i), 0).unwrap_or_else(|| Utc::now())),
+                        file_type: "Text".to_string(), // Simplified, could be derived more accurately if other metadata stored
+                        thumbnail_path: None,
+                        embedding: Some(embedding_vec),
+                    });
+                }
+            }
+        }
+        Err(e) => eprintln!("Could not open text table for fetching all files: {}", e),
+    }
+
+    // Fetch from image table
+    match open_or_create_image_table(conn).await {
+         Ok(image_table) => {
+            let stream = image_table
+                .query()
+                .select(Select::columns(&["file_path", "embedding", "last_modified", "thumbnail_path"])) // Removed width/height for simplicity, add if FileInfo needs it
+                .execute()
+                .await?;
+            
+            let batches = stream.try_collect::<Vec<_>>().await?;
+            for batch in batches {
+                let file_path_arr = batch.column_by_name("file_path").unwrap().as_any().downcast_ref::<StringArray>().unwrap();
+                let embedding_arr = batch.column_by_name("embedding").unwrap().as_any().downcast_ref::<FixedSizeListArray>().unwrap();
+                let last_modified_arr = batch.column_by_name("last_modified").unwrap().as_any().downcast_ref::<TimestampSecondArray>().unwrap();
+                let thumbnail_path_arr = batch.column_by_name("thumbnail_path").and_then(|a| a.as_any().downcast_ref::<StringArray>());
+
+                for i in 0..batch.num_rows() {
+                    let path_str = file_path_arr.value(i).to_string();
+                    let name = PathBuf::from(&path_str).file_name().unwrap_or_default().to_string_lossy().into_owned();
+                    
+                    let embedding_values_data = embedding_arr.values(i);
+                    let embedding_values = embedding_values_data.as_any().downcast_ref::<Float32Array>().unwrap();
+                    let embedding_vec: Vec<f32> = embedding_values.values().iter().copied().collect();
+
+                    all_files.push(FileInfo {
+                        name,
+                        path: path_str,
+                        is_directory: false,
+                        size: None, 
+                        modified: Some(DateTime::from_timestamp(last_modified_arr.value(i), 0).unwrap_or_else(|| Utc::now())),
+                        file_type: "Image".to_string(), // Simplified
+                        thumbnail_path: thumbnail_path_arr.map(|arr| if arr.is_valid(i) { Some(arr.value(i).to_string()) } else { None }).flatten(),
+                        embedding: Some(embedding_vec),
+                    });
+                }
+            }
+        }
+        Err(e) => eprintln!("Could not open image table for fetching all files: {}", e),
+    }
+    
+    let mut unique_files = Vec::new();
+    let mut seen_paths = HashSet::new();
+    for file_info in all_files {
+        if seen_paths.insert(file_info.path.clone()) {
+            unique_files.push(file_info);
+        }
+    }
+
+    Ok(unique_files)
 }

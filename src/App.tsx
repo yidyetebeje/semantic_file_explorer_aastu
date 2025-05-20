@@ -6,6 +6,7 @@ import MainLayout from "./components/layout/MainLayout";
 import EnhancedSearchResults from "./components/Search/EnhancedSearchResults"; 
 import IndexingStatus from "./components/IndexingStatus";
 import RecentItemsPage from "./components/RecentItems/RecentItemsPage";
+import CategoriesPage from "./pages/CategoriesPage"; // Import the new page
 import { 
   loadHomeDirAtom, 
   loadLocationsOnInitAtom, 
@@ -37,6 +38,8 @@ function App() {
       setCurrentView('indexing-status');
     } else if (currentPath === '/recent-items') {
       setCurrentView('recent-items');
+    } else if (currentPath === '/categories') { // Add new route
+      setCurrentView('categories');
     } else {
       setCurrentView('file-explorer');
     }
@@ -48,6 +51,8 @@ function App() {
         return <IndexingStatus />;
       case 'recent-items':
         return <RecentItemsPage />;
+      case 'categories': // Add new case
+        return <CategoriesPage />;
       case 'file-explorer':
       default:
         return (

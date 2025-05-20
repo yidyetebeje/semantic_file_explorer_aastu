@@ -18,6 +18,7 @@ use commands::search_commands::{
 use commands::search_commands::{get_document_count, semantic_search_command};
 use commands::env_commands::get_gemini_api_key;
 use commands::chat_commands::{send_message_to_gemini, search_files, get_document_content};
+use commands::category_commands::{get_all_categories, get_files_by_category};
 pub mod benchmark;
 pub mod chunker;
 pub mod commands;
@@ -122,6 +123,9 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         // Chat commands
         send_message_to_gemini,
         search_files,
-        get_document_content
+        get_document_content,
+        // Category commands
+        get_all_categories,
+        get_files_by_category
     ])
 }

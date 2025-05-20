@@ -11,6 +11,7 @@ import {
   Clock,
   Folder,
   Database,
+  LayoutGrid, // Added LayoutGrid
 } from "lucide-react";
 import LibraryDropdown from "./LibraryDropdown";
 import SidebarSection from "./SidebarSection";
@@ -115,6 +116,7 @@ const Sidebar = () => {
     // Use the navigateAtom instead of window.location to stay within the SPA
     navigate('/indexing-status');
   };
+  const handleCategoriesClick = () => navigate('/categories'); // Added handler
 
   return (
     <div className="w-60 border-r border-gray-800 h-screen bg-gray-900 flex flex-col">
@@ -128,6 +130,7 @@ const Sidebar = () => {
         <SidebarSection title="Overview">
           <NavButton icon={HardDrive} label="Macintosh HD" onClick={handleMacintoshHDClick} />
           <NavButton icon={Laptop} label={hostname} onClick={handleComputerClick} />
+          <NavButton icon={LayoutGrid} label="Categories" onClick={handleCategoriesClick} /> 
         </SidebarSection>
 
         <SidebarSection title="Locations">
