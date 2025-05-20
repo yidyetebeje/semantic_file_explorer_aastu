@@ -55,7 +55,7 @@ pub fn run() {
 
             // Initialize the semantic search index
             tracing::info!("Starting Downloads folder indexing for semantic search");
-            // run_startup_indexing().await;
+            run_startup_indexing().await;
 
             // Initialize the filename index with common directories
             tracing::info!("Starting filename index initialization");

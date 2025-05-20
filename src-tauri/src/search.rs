@@ -1,14 +1,13 @@
 use crate::db::{
-    open_or_create_image_table, open_or_create_text_table, DbError, IMAGE_TABLE_NAME,
-    TEXT_TABLE_NAME,
+    open_or_create_image_table, open_or_create_text_table, DbError,
 };
 use crate::embedder::{embed_text, EmbeddingError};
 use crate::extractor::ContentType;
-use crate::image_embedder::{embed_image, embed_text_for_image_search, ImageEmbeddingError};
+use crate::image_embedder::{embed_text_for_image_search, ImageEmbeddingError};
 use arrow_array::{Array, Float32Array, StringArray, TimestampSecondArray};
 use futures_util::TryStreamExt;
 use lancedb::connection::Connection;
-use lancedb::query::{self, ExecutableQuery, QueryBase, Select};
+use lancedb::query::{ExecutableQuery, QueryBase, Select};
 use lancedb::table::Table;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};

@@ -2,15 +2,13 @@
 
 use notify::{Event, RecommendedWatcher, RecursiveMode, Result as NotifyResult, Watcher as NotifyWatcher, EventKind};
 use notify::event::{CreateKind, ModifyKind, RenameMode, DataChange};
-use log::{error, info, warn, debug};
+use log::{error, info, warn};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
 use thiserror::Error;
-use crate::db::{delete_document, upsert_document, DbError, TEXT_TABLE_NAME as TABLE_NAME, connect_db, open_or_create_text_table};
+use crate::db::{delete_document, upsert_document, DbError, connect_db, open_or_create_text_table};
 use crate::embedder::embed_text;
 use crate::extractor::{extract_text, calculate_hash};
-// Don't need these imports for the index since we only use FILENAME_INDEX
-// use crate::filename_index::{FilenameIndex, ThreadSafeIndex};
 use crate::commands::search_commands::{add_file_to_index, remove_file_from_index};
 use lancedb::Table;
 use std::sync::Arc;
@@ -39,7 +37,7 @@ pub enum WatcherError {
 /// Returns the watcher instance and a receiver channel for events.
 pub async fn setup_watcher(
     path_to_watch: &str,
-    table: Table
+    _table: Table
 ) -> Result<(RecommendedWatcher, Receiver<NotifyResult<Event>>), WatcherError> {
     let path = Path::new(path_to_watch);
     info!("Setting up file watcher for path: {:?}", path);

@@ -75,8 +75,10 @@ futures-util = "0.3.28" # For stream handling
 walkdir = "2.4.0" # For directory traversal
 dirs = "5.0.1" # For finding user directories
 strsim = "0.10.0" # For string similarity metrics
-tantivy = "0.22" # Full-text search engine library
+rust_search = "2.1.0" # File search library
 directories = "5.0" # Platform-specific directory paths (supersedes directories-next)
+
+shellexpand = "2.1" # For tilde path expansion
 
 # Arrow dependencies (for LanceDB)
 arrow-array = "51.0" # Match version used by lancedb 0.6.0

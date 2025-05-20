@@ -197,22 +197,22 @@ pub async fn index_downloads_folder() -> Result<IndexingStats, String> {
                 let content_type = get_content_type(path);
                 match content_type {
                     ContentType::Text => {
-                        // text_files_processed += 1;
-                        // println!("text files {}", text_files_processed);
-                        // println!("path {:?}", path);
+                        text_files_processed += 1;
+                        println!("text files {}", text_files_processed);
+                        println!("path {:?}", path);
                         
-                        // // Process text file
-                        // if let Err(e) = process_text_file(path, &text_table).await {
-                        //     error!("Error processing text file {}: {}", path.display(), e);
-                        //     files_failed += 1;
-                        //     text_files_failed += 1;
-                        //     failed_files.push(path.to_string_lossy().to_string());
-                        // } else {
-                        //     info!("Indexed text file: {}", path.display());
-                        //     db_inserts += 1;
-                        //     text_files_indexed += 1;
-                        //     indexed_files.push(path.to_string_lossy().to_string());
-                        // }
+                        // Process text file
+                        if let Err(e) = process_text_file(path, &text_table).await {
+                            error!("Error processing text file {}: {}", path.display(), e);
+                            files_failed += 1;
+                            text_files_failed += 1;
+                            failed_files.push(path.to_string_lossy().to_string());
+                        } else {
+                            info!("Indexed text file: {}", path.display());
+                            db_inserts += 1;
+                            text_files_indexed += 1;
+                            indexed_files.push(path.to_string_lossy().to_string());
+                        }
                     },
                     ContentType::Image => {
                         image_files_processed += 1;
@@ -432,71 +432,13 @@ async fn handle_text_indexing(
 
 /// Handle image file indexing with a batch of files in a separate thread
 async fn handle_image_indexing(
-    image_files: Vec<String>,
-    table: Arc<lancedb::Table>
+    _image_files: Vec<String>,
+    _table: Arc<lancedb::Table>
 ) -> HashMap<String, Result<(), String>> {
-    let mut results = HashMap::new();
+    let results = HashMap::new();
     
     // Process files in batches to avoid overwhelming the system
-    // let chunks = image_files.chunks(10);
-    // for chunk in chunks {
-    //     // Create futures for each file in the chunk
-    //     let futures = chunk.iter().map(|file_path_str| {
-    //         let path = Path::new(file_path_str);
-    //         let table_clone = Arc::clone(&table);
-            
-    //         async move {
-    //             let result = async {
-    //                 // Process the image
-    //                 let image_path = process_image(path).map_err(|e| {
-    //                     warn!("Image processing error for {}: {}", path.display(), e);
-    //                     format!("Image processing failed: {}", e)
-    //                 })?;
-                    
-    //                 // Calculate file hash for the image
-    //                 let file_hash = calculate_file_hash(path).map_err(|e| {
-    //                     error!("Hashing error for {}: {}", path.display(), e);
-    //                     format!("File hash calculation failed: {}", e)
-    //                 })?;
-                    
-    //                 // Generate embedding for the image
-    //                 let embedding = embed_image(&image_path).map_err(|e| {
-    //                     error!("Image embedding error for {}: {}", path.display(), e);
-    //                     format!("Image embedding generation failed: {}", e)
-    //                 })?;
-                    
-    //                 // For now, we don't have image dimensions or thumbnails
-    //                 let width: Option<i32> = None;
-    //                 let height: Option<i32> = None;
-    //                 let thumbnail_path: Option<&str> = None;
-                    
-    //                 // Store in the database
-    //                 upsert_image(
-    //                     &table_clone, 
-    //                     file_path_str, 
-    //                     &file_hash, 
-    //                     &embedding, 
-    //                     width, 
-    //                     height, 
-    //                     thumbnail_path
-    //                 ).await.map_err(|e| {
-    //                     error!("Database error for {}: {}", path.display(), e);
-    //                     format!("Database upsert failed: {}", e)
-    //                 })?;
-                    
-    //                 Ok(())
-    //             }.await;
-                
-    //             (file_path_str.clone(), result)
-    //         }
-    //     }).collect::<Vec<_>>();
-        
-    //     // Wait for all futures in this chunk to complete
-    //     let chunk_results = join_all(futures).await;
-    //     for (path, result) in chunk_results {
-    //         results.insert(path, result);
-    //     }
-    // }
+    // Commented out code...
     
     results
 }
