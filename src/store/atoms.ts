@@ -2,6 +2,7 @@ import { atom } from "jotai";
 import { FileInfo, ViewMode } from "../types/file";
 import { CustomLocation } from "../types/location";
 import { SearchResponse, SearchResult, FilenameSearchResult, FileCategory } from "../types/search"; 
+import { atomWithStorage } from 'jotai/utils';
 import {
   fetchDirectoryContents,
   getHomeDir,
@@ -181,6 +182,9 @@ export const triggerSearchAtom = atom(
       set(filenameSearchResultsAtom, []);
     }
     set(hasSearchedAtom, true); // Set the flag to indicate a search has been performed
+
+    // Add search query to recent searches
+    set(addToRecentSearchesAtom, query);
 
     try {
       if (searchMode === 'semantic') {
@@ -374,6 +378,80 @@ export const filenameIndexStatsAtom = atom<FilenameIndexStats | null>(null);
 export const isFilenameIndexingAtom = atom<boolean>(false);
 export const selectedFolderForFilenameIndexAtom = atom<string | null>(null);
 export const isClearingFilenameIndexAtom = atom<boolean>(false);
+
+// --- Recent Files and Searches Atoms ---
+export interface RecentItem {
+  path: string;
+  name: string;
+  accessedAt: number; // timestamp
+  type: 'file' | 'directory';
+  fileType?: string;
+}
+
+export interface RecentSearchItem {
+  query: string;
+  mode: SearchMode;
+  timestamp: number;
+}
+
+// Store recent items with persistence (using localStorage)
+export const recentItemsAtom = atomWithStorage<RecentItem[]>('recentItems', []);
+export const recentSearchesAtom = atomWithStorage<RecentSearchItem[]>('recentSearches', []);
+
+// Maximum number of recent items to keep
+export const MAX_RECENT_ITEMS = 10;
+export const MAX_RECENT_SEARCHES = 10;
+
+// Action atom to add a file or directory to recent items
+export const addToRecentItemsAtom = atom(
+  null,
+  (get, set, item: Omit<RecentItem, 'accessedAt'>) => {
+    const recentItems = get(recentItemsAtom);
+    
+    // Don't add if the item is already at the top of the list
+    if (recentItems.length > 0 && recentItems[0].path === item.path) {
+      return;
+    }
+    
+    // Create new item with current timestamp
+    const newItem: RecentItem = {
+      ...item,
+      accessedAt: Date.now()
+    };
+    
+    // Filter out this item if it already exists (to avoid duplicates)
+    const filteredItems = recentItems.filter(existing => existing.path !== item.path);
+    
+    // Add new item to the beginning of the array and limit the size
+    set(recentItemsAtom, [newItem, ...filteredItems].slice(0, MAX_RECENT_ITEMS));
+  }
+);
+
+// Action atom to add a search query to recent searches
+export const addToRecentSearchesAtom = atom(
+  null,
+  (get, set, query: string) => {
+    if (!query.trim()) return;
+    
+    const recentSearches = get(recentSearchesAtom);
+    const searchMode = get(searchModeAtom);
+    
+    // Create new search item
+    const newSearchItem: RecentSearchItem = {
+      query,
+      mode: searchMode,
+      timestamp: Date.now()
+    };
+    
+    // Filter out this query if it already exists
+    const filteredItems = recentSearches.filter(
+      existing => !(existing.query === query && existing.mode === searchMode)
+    );
+    
+    // Add new item to the beginning and limit the size
+    set(recentSearchesAtom, [newSearchItem, ...filteredItems].slice(0, MAX_RECENT_SEARCHES));
+  }
+);
 export const filenameIndexingResultAtom = atom<{ directory?: string, files_added: number, errors?: string[] } | null>(null);
 
 // Atom to trigger indexing for a specific folder

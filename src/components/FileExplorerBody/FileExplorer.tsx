@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { FileInfo, ViewMode } from "../../types/file";
+import { FileInfo } from "../../types/file";
 import FileGrid from "./FileGrid";
-import TopBar from "../TopBar/TopBar";
 import { Grid, List, X } from "lucide-react";
 import { openPath } from "../../services/test";
 import {
@@ -12,18 +11,18 @@ import {
   selectedFileAtom,
   showInspectorAtom,
   currentPathAtom,
-  directoryFilesAtom,
   isLoadingAtom,
   errorAtom,
   loadDirectoryAtom,
   visibleFilesAtom,
-  navigateAtom
+  navigateAtom,
+  addToRecentItemsAtom
 } from '../../store/atoms';
 
 const FileExplorer = () => {
   const [viewMode, setViewMode] = useAtom(viewModeAtom);
-  const [fileSize, setFileSize] = useAtom(fileSizeAtom);
-  const [gapSize, setGapSize] = useAtom(gapSizeAtom);
+  const [fileSize] = useAtom(fileSizeAtom);
+  const [gapSize] = useAtom(gapSizeAtom);
   const [selectedFile, setSelectedFile] = useAtom(selectedFileAtom);
   const [showInspector, setShowInspector] = useAtom(showInspectorAtom);
 
@@ -34,6 +33,7 @@ const FileExplorer = () => {
 
   const loadDirectory = useSetAtom(loadDirectoryAtom);
   const navigate = useSetAtom(navigateAtom);
+  const addToRecentItems = useSetAtom(addToRecentItemsAtom);
 
   useEffect(() => {
     console.log(`Path changed to: ${currentPath}, triggering directory load.`);
@@ -61,19 +61,30 @@ const FileExplorer = () => {
     console.log("Double-clicked:", file);
     if (file.is_directory) {
       navigate(file.path);
+      // Add directory to recent items
+      addToRecentItems({
+        path: file.path,
+        name: file.name,
+        type: 'directory',
+        fileType: 'directory'
+      });
     } else {
       try {
         await openPath(file.path);
+        // Add file to recent items
+        addToRecentItems({
+          path: file.path,
+          name: file.name,
+          type: 'file',
+          fileType: file.file_type || ''
+        });
       } catch (err) {
         console.error("Failed to open file:", err);
       }
     }
   };
 
-  const handleInspectorToggle = () => {
-    setShowInspector(prev => !prev);
-  };
-  
+  // Toggle inspector visibility
   const handleCloseInspector = () => {
     setShowInspector(false);
   };
@@ -133,6 +144,13 @@ const FileExplorer = () => {
               onClick={async () => {
                 try {
                   await openPath(selectedFile.path);
+                  // Add file to recent items when opened from inspector
+                  addToRecentItems({
+                    path: selectedFile.path,
+                    name: selectedFile.name,
+                    type: 'file',
+                    fileType: selectedFile.file_type || ''
+                  });
                 } catch (err) {
                   console.error("Failed to open file:", err);
                 }

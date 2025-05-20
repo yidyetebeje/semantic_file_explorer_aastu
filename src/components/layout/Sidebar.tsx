@@ -19,7 +19,8 @@ import { useSetAtom, useAtom } from 'jotai';
 import {
   navigateAtom,
   customLocationsAtom,
-  addCustomLocationAtom
+  addCustomLocationAtom,
+  recentItemsAtom
 } from '../../store/atoms';
 import {
   getDocumentsDir,
@@ -37,8 +38,10 @@ const Sidebar = () => {
   const navigate = useSetAtom(navigateAtom);
   const addLocation = useSetAtom(addCustomLocationAtom);
   const [customLocations] = useAtom(customLocationsAtom);
+  const [recentItems] = useAtom(recentItemsAtom);
   const [hostname, setHostname] = useState("Computer");
   const [homeDirPath, setHomeDirPath] = useState("/");
+
 
   useEffect(() => {
     getHostname()
@@ -105,7 +108,7 @@ const Sidebar = () => {
     }
   };
   const handleSettingsClick = () => console.log("Settings clicked (not implemented)");
-  const handleRecentClick = () => console.log("Recent clicked (not implemented)");
+  const handleRecentClick = () => navigate('/recent-items');
   
   // Define a handler to show indexing status page
   const handleIndexingClick = () => {
@@ -155,7 +158,11 @@ const Sidebar = () => {
       <div className="border-t border-gray-800 p-4 bg-gray-900">
         <NavButton icon={Database} label="Indexing Status" onClick={handleIndexingClick} />
         <NavButton icon={Settings} label="Settings" onClick={handleSettingsClick} />
-        <NavButton icon={Clock} label="Recent" onClick={handleRecentClick} />
+        <NavButton 
+          icon={Clock} 
+          label={`Recent${recentItems.length > 0 ? ` (${recentItems.length})` : ''}`} 
+          onClick={handleRecentClick}
+        />
       </div>
     </div>
   );

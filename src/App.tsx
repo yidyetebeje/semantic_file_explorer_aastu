@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { useSetAtom, useAtom } from 'jotai';
-import { useAtomValue } from 'jotai'; 
+import { useSetAtom, useAtom } from 'jotai'; 
 import "./App.css";
 import FileExplorer from "./components/FileExplorerBody/FileExplorer";
 import MainLayout from "./components/layout/MainLayout";
 import EnhancedSearchResults from "./components/Search/EnhancedSearchResults"; 
 import IndexingStatus from "./components/IndexingStatus";
+import RecentItemsPage from "./components/RecentItems/RecentItemsPage";
 import { 
   loadHomeDirAtom, 
   loadLocationsOnInitAtom, 
-  searchQueryAtom, 
-  hasSearchedAtom,
   currentPathAtom
 } from "./store/atoms"; 
 
@@ -31,6 +29,8 @@ function App() {
     // Check if the path is a special route
     if (currentPath === '/indexing-status') {
       setCurrentView('indexing-status');
+    } else if (currentPath === '/recent-items') {
+      setCurrentView('recent-items');
     } else {
       setCurrentView('file-explorer');
     }
@@ -40,6 +40,8 @@ function App() {
     switch (currentView) {
       case 'indexing-status':
         return <IndexingStatus />;
+      case 'recent-items':
+        return <RecentItemsPage />;
       case 'file-explorer':
       default:
         return (
