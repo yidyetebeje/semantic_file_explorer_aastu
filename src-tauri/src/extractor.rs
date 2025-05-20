@@ -2,9 +2,11 @@
 
 use std::fs;
 use std::path::Path;
+use std::io::Read;
 use extractous::Extractor;
+use log::{debug, error, info, warn};
+use dotext::{Docx, MsDoc};
 use thiserror::Error;
-use log::{error, debug, info, warn};
 use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
 
@@ -18,7 +20,8 @@ pub enum ExtractorError {
     PdfExtractionFailed(String, String),
     #[error("Image file handling: {0}")]
     ImageHandling(String),
-    // TODO: Add specific errors for PDF parsing if needed
+    #[error("DOCX extraction failed for {0}: {1}")]
+    DocxExtractionFailed(String, String),
 }
 
 /// Content type enum to distinguish between different file types
@@ -30,7 +33,7 @@ pub enum ContentType {
 }
 
 /// Lists of supported file extensions
-pub const SUPPORTED_TEXT_EXTENSIONS: &[&str] = &["pdf"];
+pub const SUPPORTED_TEXT_EXTENSIONS: &[&str] = &["pdf", "txt", "md", "docx"];
 pub const SUPPORTED_IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp"];
 
 /// Determines the content type of a file based on its extension
@@ -81,6 +84,28 @@ pub fn extract_text(file_path: &Path) -> Result<String, ExtractorError> {
                 Ok(content)
             }
         },
+        Some("docx") => {
+            info!("Extracting text from DOCX using dotext: {}", file_path.display());
+            match Docx::open(file_path) {
+                Ok(mut docx_reader) => {
+                    let mut text_content = String::new();
+                    match docx_reader.read_to_string(&mut text_content) {
+                        Ok(_) => Ok(text_content),
+                        Err(e) => {
+                            error!("Failed to extract text from DOCX (dotext) {}: {}", file_path.display(), e);
+                            // Map dotext::Error to ExtractorError. Assuming dotext::Error is std::io::Error compatible for now.
+                            // If dotext::Error is more complex, this mapping will need adjustment.
+                            Err(ExtractorError::DocxExtractionFailed(file_path.display().to_string(), e.to_string()))
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to open DOCX file with dotext {}: {}", file_path.display(), e);
+                     // Map dotext::Error to ExtractorError
+                    Err(ExtractorError::DocxExtractionFailed(file_path.display().to_string(), e.to_string()))
+                }
+            }
+        }
         Some("txt") | Some("md") => {
             let ext_str = extension.as_ref().unwrap();
             info!("Extracting text from {}: {}", ext_str, file_path.display());
