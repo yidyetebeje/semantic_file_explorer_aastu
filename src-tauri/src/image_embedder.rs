@@ -10,9 +10,6 @@ use std::sync::Mutex;
 const MODEL_NAME: ImageEmbeddingModel = ImageEmbeddingModel::NomicEmbedVisionV15;
 const CACHE_DIR_NAME: &str = ".cache"; // Same cache directory as text model
 
-// Dimension of the Nomic Embed Vision v1.5 embeddings
-const NOMIC_EMBED_VISION_V15_DIM: usize = 768; // NomicEmbedVisionV15 has 768 dimensions
-
 // Define potential errors during image embedding
 #[derive(Error, Debug)]
 pub enum ImageEmbeddingError {

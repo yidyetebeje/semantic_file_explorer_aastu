@@ -1,4 +1,4 @@
-use log::{info, warn, error};
+use log::{info, error};
 use std::path::PathBuf;
 use std::fs;
 use semantic_file_explorer::db::{connect_db, get_db_path, TEXT_TABLE_NAME, IMAGE_TABLE_NAME};

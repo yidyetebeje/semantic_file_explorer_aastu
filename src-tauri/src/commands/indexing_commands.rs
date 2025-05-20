@@ -1,6 +1,6 @@
 // src-tauri/src/commands/indexing_commands.rs
 
-use crate::core::indexer::{index_downloads_folder, index_folder, IndexingStats, get_last_indexing_stats};
+use crate::core::indexer::{index_downloads_folder, index_folder, get_last_indexing_stats};
 use crate::db::{connect_db, TABLE_NAME, clear_data};
 use log::{info, error};
 use serde::{Deserialize, Serialize};
@@ -198,10 +198,10 @@ pub async fn get_vector_db_stats_command() -> Result<VectorDbStatsResponse, Stri
         Ok(conn) => {
             // Call the db function to get stats
             match crate::db::get_vector_db_stats(&conn).await {
-                Ok((text_count, image_count)) => {
-                    let total_count = text_count + image_count;
-                    info!("Vector database stats: {} text documents, {} image documents, {} total", 
-                          text_count, image_count, total_count);
+                Ok((text_count, image_count, amharic_count)) => {
+                    let total_count = text_count + image_count + amharic_count;
+                    info!("Vector database stats: {} text documents, {} image documents, {} Amharic documents, {} total", 
+                          text_count, image_count, amharic_count, total_count);
                     
                     Ok(VectorDbStatsResponse {
                         text_documents_count: text_count,

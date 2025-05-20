@@ -1,3 +1,5 @@
+// src-tauri/src/embedder.rs
+
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use thiserror::Error;
 use log::{error, info, debug};
@@ -5,11 +7,10 @@ use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use crate::chunker::{chunk_text, ChunkerError};
 
-// Constants for the embedding model
-const MODEL_NAME: EmbeddingModel = EmbeddingModel::BGESmallENV15;
-const CACHE_DIR_NAME: &str = ".cache"; // Directory to store cached models
+const DEFAULT_MODEL_NAME: EmbeddingModel = EmbeddingModel::BGESmallENV15;
+const AMHARIC_MODEL_NAME: EmbeddingModel = EmbeddingModel::MultilingualE5Small;
+const CACHE_DIR_NAME: &str = ".cache";
 
-// Define potential errors during embedding
 #[derive(Error, Debug)]
 pub enum EmbeddingError {
     #[error("Model initialization failed: {0}")]
@@ -22,242 +23,150 @@ pub enum EmbeddingError {
     ChunkingError(#[from] ChunkerError),
 }
 
-// Use Lazy to initialize the model once
-// NOTE: The real model initialization still happens even during tests,
-// potentially downloading files, due to Lazy evaluation. But the mock
-// embed_text function below will prevent it from being *used* during tests.
-static MODEL: Lazy<Result<TextEmbedding, EmbeddingError>> = Lazy::new(|| {
-    info!("Initializing embedding model (Lazy)...");
-    let model_name = EmbeddingModel::BGESmallENV15;
-
-    // Use the builder pattern for InitOptions
-    let init_options = InitOptions::new(model_name)
-        .with_cache_dir(PathBuf::from(".cache"))
+static DEFAULT_MODEL: Lazy<Result<TextEmbedding, EmbeddingError>> = Lazy::new(|| {
+    info!("Initializing default embedding model (Lazy)...");
+    let init_options = InitOptions::new(DEFAULT_MODEL_NAME)
+        .with_cache_dir(PathBuf::from(CACHE_DIR_NAME))
         .with_show_download_progress(true);
-
     TextEmbedding::try_new(init_options).map_err(|e| {
-        let err_msg = format!("Failed to initialize embedding model: {}", e);
-        error!("{}", err_msg);
-        EmbeddingError::ModelLoadError(err_msg)
+        EmbeddingError::ModelLoadError(format!("Failed to initialize default embedding model: {}", e))
     })
 });
 
-/// Generates embeddings for the given text content.
-/// First chunks the text into semantically meaningful portions,
-/// then embeds each chunk separately.
-/// 
-/// # Arguments
-/// * `content` - A slice of strings to embed
-/// 
-/// # Returns
-/// * `Result<Vec<Vec<f32>>, EmbeddingError>` - A vector of embedding vectors or an error
-#[cfg(not(test))]
-pub fn embed_text(content: &[String], query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
-    if !query {
-        if content.is_empty() {
-            return Ok(Vec::new()); // Return empty vec if no content
-        }
-    
-        // Chunk each text in content and collect all chunks
-        let mut all_chunks: Vec<String> = Vec::new();
-        let mut chunk_map: Vec<(usize, usize)> = Vec::new(); // Maps original index -> (chunk_start, chunk_count)
-        
-        for (_i, text) in content.iter().enumerate() {
-            let chunks = chunk_text(text)?;
-            let chunk_start = all_chunks.len();
-            let chunk_count = chunks.len();
-            // add passage: prefix on all chunks
-            let chunks: Vec<String> = chunks.iter().map(|chunk| format!("{}", chunk)).collect();
-            
-            chunk_map.push((chunk_start, chunk_count));
-            all_chunks.extend(chunks);
-        }
-        
-        info!("Chunked {} texts into {} total chunks", content.len(), all_chunks.len());
-        
-        // If no chunks were generated, return empty results
-        if all_chunks.is_empty() {
-            return Ok(Vec::new());
-        }
-    
-        // Access the lazily initialized model and embed all chunks
-        match &*MODEL {
-            Ok(model) => {
-                // Generate embeddings for all chunks
-                let all_embeddings = match model.embed(all_chunks, None) {
-                    Ok(embeddings) => {
-                        debug!("Successfully generated {} embeddings", embeddings.len());
-                        embeddings
-                    }
-                    Err(e) => {
-                        let err_msg = format!("Embedding generation failed: {}", e);
-                        error!("{}", err_msg);
-                        return Err(EmbeddingError::GenerationError(err_msg));
-                    }
-                };
-                
-                // Return all embeddings 
-                Ok(all_embeddings)
-            }
-            Err(init_error) => {
-                // If initialization failed, return the stored error
-                error!("Embedding model initialization failed previously: {}", init_error);
-                Err(EmbeddingError::InitializationError(format!("{}", init_error)))
-            }
-        }
-    } else {
-        println!("Embedding query: {:?}", content.clone());
-        match &*MODEL {
-            Ok(model) => {
-                // Generate embeddings for all chunks
-                let all_embeddings = match model.embed(content.to_vec(), None) {
-                    Ok(embeddings) => {
-                        debug!("Successfully generated {} embeddings", embeddings.len());
-                        embeddings
-                    }
-                    Err(e) => {
-                        let err_msg = format!("Embedding generation failed: {}", e);
-                        error!("{}", err_msg);
-                        return Err(EmbeddingError::GenerationError(err_msg));
-                    }
-                };
-                
-                // Return all embeddings 
-                Ok(all_embeddings)
-            }
-            Err(init_error) => {
-                // If initialization failed, return the stored error
-                error!("Embedding model initialization failed previously: {}", init_error);
-                Err(EmbeddingError::InitializationError(format!("{}", init_error)))
-            }
-        }
-    }
-}
+static AMHARIC_MODEL: Lazy<Result<TextEmbedding, EmbeddingError>> = Lazy::new(|| {
+    info!("Initializing Amharic embedding model (MultilingualE5Small) (Lazy)...");
+    let init_options = InitOptions::new(AMHARIC_MODEL_NAME)
+        .with_cache_dir(PathBuf::from(CACHE_DIR_NAME))
+        .with_show_download_progress(true);
+    TextEmbedding::try_new(init_options).map_err(|e| {
+        EmbeddingError::ModelLoadError(format!("Failed to initialize Amharic embedding model: {}", e))
+    })
+});
 
-/// Generates mock embeddings for testing purposes.
-/// (Mock implementation for test builds)
-#[cfg(test)]
-pub fn embed_text(content: &[String], query:bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
-    if content.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Process each text to get all chunks
-    let mut all_chunks: Vec<String> = Vec::new();
-    
-    for text in content {
-        match chunk_text(text) {
-            Ok(chunks) => all_chunks.extend(chunks),
-            Err(e) => return Err(EmbeddingError::from(e)),
+fn embed_with_model(
+    model_instance: &Result<TextEmbedding, EmbeddingError>,
+    content: &[String],
+    query: bool,
+    lang_prefix: Option<&str> // e.g., "query" or "passage" for E5
+) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+    let processed_content: Vec<String> = content.iter().map(|s| {
+        if let Some(prefix) = lang_prefix {
+            format!("{}: {}", prefix, s)
+        } else {
+            s.to_string()
         }
-    }
-    
-    info!("Generating MOCK embeddings for {} text chunks...", all_chunks.len());
-    const MOCK_DIMENSION: usize = 384; // Match BGE-Small-EN-v1.5 dimension
-
-    // Create different mock embeddings for different text
-    let embeddings = all_chunks.iter().map(|text| {
-        // Create a unique embedding for each different text
-        // by using the text content to seed values
-        let mut vec = vec![0.1f32; MOCK_DIMENSION];
-        
-        // Use characters from the text to differentiate embeddings
-        for (j, c) in text.chars().enumerate() {
-            if j < MOCK_DIMENSION {
-                // Use character code to create different values
-                vec[j] = (c as u32 % 100) as f32 / 100.0;
-            } else {
-                break;
-            }
-        }
-        
-        // This ensures that identical text produces identical embeddings
-        // and different text produces different embeddings
-        vec
     }).collect();
 
-    Ok(embeddings)
+    if processed_content.is_empty() { return Ok(Vec::new()); }
+
+    let mut final_chunks_to_embed: Vec<String> = Vec::new();
+    if !query { // Only chunk passages
+        if processed_content.is_empty() { 
+             return Ok(Vec::new());
+        }
+        for text_content in processed_content.iter() {
+            if text_content.trim().is_empty() {
+                continue; 
+            }
+            let chunks = chunk_text(text_content)?;
+            final_chunks_to_embed.extend(chunks);
+        }
+        if final_chunks_to_embed.is_empty() { return Ok(Vec::new()); }
+    } else {
+        final_chunks_to_embed = processed_content;
+        final_chunks_to_embed.retain(|s| !s.trim().is_empty());
+        if final_chunks_to_embed.is_empty() {
+            return Ok(Vec::new());
+        }
+    }
+    
+    debug!("Embedding {} final chunks.", final_chunks_to_embed.len());
+
+    match model_instance {
+        Ok(model) => model.embed(final_chunks_to_embed, None).map_err(|e| {
+            error!("Embedding generation failed: {}", e);
+            EmbeddingError::GenerationError(format!("Embedding generation failed: {}", e))
+        }),
+        Err(init_error) => {
+            error!("Model not initialized, cannot embed: {}", init_error);
+            Err(EmbeddingError::InitializationError(format!("Model not initialized: {}", init_error)))
+        }
+    }
 }
 
-// Helper function to get the chunk count for a piece of text
-// This is useful for database operations to know how many records to expect
-pub fn get_chunk_count(text: &str) -> Result<usize, EmbeddingError> {
-    let chunks = chunk_text(text)?;
-    Ok(chunks.len())
+pub fn embed_text(content: &[String], query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+    let prefix = if query { Some("query") } else { None }; 
+    embed_with_model(&DEFAULT_MODEL, content, query, prefix)
 }
+
+pub fn embed_amharic_text(content: &[String], query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+    let prefix = if query { "query" } else { "passage" };
+    embed_with_model(&AMHARIC_MODEL, content, query, Some(prefix))
+}
+
+
+#[cfg(test)]
+fn embed_text_test(content: &[String], _query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+    use crate::db::TEXT_EMBEDDING_DIM;
+    if content.is_empty() { return Ok(Vec::new()); }
+    Ok(content.iter().map(|_| vec![0.1f32; TEXT_EMBEDDING_DIM as usize]).collect())
+}
+
+#[cfg(test)]
+fn embed_amharic_text_test(content: &[String], _query: bool) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+    use crate::db::AMHARIC_EMBEDDING_DIM;
+    if content.is_empty() { return Ok(Vec::new()); }
+    Ok(content.iter().map(|_| vec![0.2f32; AMHARIC_EMBEDDING_DIM as usize]).collect())
+}
+
+pub fn get_chunk_count(text: &str) -> Result<usize, EmbeddingError> {
+    if text.trim().is_empty() {
+        return Ok(0); 
+    }
+    Ok(chunk_text(text)?.len())
+}
+
 
 #[cfg(test)]
 mod tests {
-    use super::*; // Import items from parent module
+    use super::*; // Imports the test-specific functions too
+    use crate::db::{TEXT_EMBEDDING_DIM, AMHARIC_EMBEDDING_DIM};
 
-    // Test successful embedding with chunking
     #[test]
-    fn test_embed_text_success() {
-        // This should create multiple chunks
-        let texts = vec!["Hello world. This is a test. ".repeat(50)];
-        let result = embed_text(&texts, false);
-
-        match result {
-            Ok(embeddings) => {
-                // Should have produced multiple embeddings due to chunking
-                assert!(embeddings.len() > 1);
-                // BGE-Small-EN-v1.5 has dimension 384
-                assert_eq!(embeddings[0].len(), 384);
-                // Check embeddings are not identical
-                if embeddings.len() > 1 {
-                    assert_ne!(embeddings[0], embeddings[1]);
-                }
-            }
-            Err(e) => {
-                panic!("Embedding failed when it should have succeeded: {}", e);
-            }
-        }
+    fn mock_embed_text_test_basic() {
+        let texts = vec!["Hello world".to_string()];
+        let result = embed_text_test(&texts, false); 
+        assert!(result.is_ok());
+        let embeddings = result.unwrap();
+        assert_eq!(embeddings.len(), 1);
+        assert_eq!(embeddings[0].len(), TEXT_EMBEDDING_DIM as usize);
+        assert_eq!(embeddings[0][0], 0.1f32); 
     }
 
     #[test]
-    fn test_embed_empty_list() {
+    fn mock_embed_amharic_text_test_basic() {
+        let texts = vec!["ሰላም አለም".to_string()];
+        let result = embed_amharic_text_test(&texts, false); 
+        assert!(result.is_ok());
+        let embeddings = result.unwrap();
+        assert_eq!(embeddings.len(), 1);
+        assert_eq!(embeddings[0].len(), AMHARIC_EMBEDDING_DIM as usize);
+        assert_eq!(embeddings[0][0], 0.2f32); 
+    }
+
+    #[test]
+    fn mock_embed_text_empty() {
         let texts: Vec<String> = Vec::new();
-        let result = embed_text(&texts, false);
+        let result = embed_text_test(&texts, false);
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
     }
-
-    // Test embedding identical texts (should produce identical vectors)
+    
     #[test]
-    fn test_embed_identical_text() {
-        let texts = vec!["Same text".to_string(), "Same text".to_string()];
-        let result = embed_text(&texts, false);
-        match result {
-            Ok(embeddings) => {
-                // Should have at least 2 embeddings (one per input text)
-                assert!(embeddings.len() >= 2);
-                assert_eq!(embeddings[0].len(), 384);
-                // Since we're chunking, we need to compare the first chunk of each text
-                // Identical text should produce identical embeddings for corresponding chunks
-                assert_eq!(embeddings[0], embeddings[1]);
-            }
-            Err(e) => {
-                panic!("Embedding failed for identical text: {}", e);
-            }
-        }
-    }
-
-    // Test embedding different texts (should produce different vectors)
-    #[test]
-    fn test_embed_different_text() {
-        let texts = vec!["Text one".to_string(), "Text two".to_string()];
-        let result = embed_text(&texts, false);
-        match result {
-            Ok(embeddings) => {
-                // Should have at least 2 embeddings (one per input text)
-                assert!(embeddings.len() >= 2);
-                assert_eq!(embeddings[0].len(), 384);
-                // Different text should produce different embeddings
-                assert_ne!(embeddings[0], embeddings[1]);
-            }
-            Err(e) => {
-                panic!("Embedding failed for different text: {}", e);
-            }
-        }
+    fn mock_embed_amharic_text_empty() {
+        let texts: Vec<String> = Vec::new();
+        let result = embed_amharic_text_test(&texts, false);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
     }
 }

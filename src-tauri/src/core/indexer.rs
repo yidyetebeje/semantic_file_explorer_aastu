@@ -7,9 +7,7 @@ use crate::db::{
     open_or_create_text_table, 
     open_or_create_image_table,
     upsert_document, 
-    upsert_image,
-    TEXT_TABLE_NAME, 
-    IMAGE_TABLE_NAME
+    upsert_image
 };
 use crate::embedder::embed_text;
 use crate::image_embedder::embed_image;
@@ -19,9 +17,7 @@ use crate::extractor::{
     process_image, 
     calculate_file_hash, 
     get_content_type, 
-    ContentType,
-    SUPPORTED_TEXT_EXTENSIONS,
-    SUPPORTED_IMAGE_EXTENSIONS
+    ContentType
 };
 use walkdir::WalkDir;
 use std::time::Instant;
@@ -441,25 +437,6 @@ async fn handle_image_indexing(
     // Commented out code...
     
     results
-}
-
-/// Check if a file is supported for indexing based on content type
-fn is_supported_file(path: &Path) -> bool {
-    // Skip hidden files (macOS dot files)
-    if let Some(file_name) = path.file_name() {
-        let file_name = file_name.to_string_lossy();
-        if file_name.starts_with('.') {
-            return false;
-        }
-    } else {
-        return false;
-    }
-    
-    // Check content type
-    match get_content_type(path) {
-        ContentType::Text | ContentType::Image => true,
-        ContentType::Unsupported => false,
-    }
 }
 
 /// Index a specific folder with parallel processing for text and image files

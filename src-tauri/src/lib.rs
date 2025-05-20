@@ -29,11 +29,6 @@ pub mod repair_db;
 pub mod search;
 pub mod watcher;
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 async fn repair_database_command() -> Result<String, String> {
     repair_db::repair_database().await?;
     Ok("Database successfully repaired".to_string())
@@ -58,7 +53,7 @@ pub fn run() {
 
             // Initialize the semantic search index
             tracing::info!("Starting Downloads folder indexing for semantic search");
-            // run_startup_indexing().await;
+            run_startup_indexing().await;
 
             // Initialize the filename index with common directories
             tracing::info!("Starting filename index initialization");

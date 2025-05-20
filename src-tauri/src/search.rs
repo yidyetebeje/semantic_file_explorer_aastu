@@ -106,7 +106,7 @@ pub async fn multimodal_search(
     // Set search parameters
     let result_limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
     let score_threshold = min_score.unwrap_or(DEFAULT_MIN_SCORE);
-    let content_filter = content_type.unwrap_or(SearchContentType::All);
+    let _content_filter = content_type.unwrap_or(SearchContentType::All);
 
     // For tests, add debug output
     #[cfg(test)]
@@ -338,7 +338,7 @@ async fn search_image_content(
     table: &Table,
     query: &str,
     limit: usize,
-    min_score: f32,
+    _min_score: f32,
 ) -> Result<Vec<SearchResult>, SearchError> {
     // Generate embedding for the query text to search image embeddings
     // We use the special text-to-image embedding function to ensure compatibility

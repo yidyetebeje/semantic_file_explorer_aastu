@@ -6,7 +6,6 @@ use extractous::Extractor;
 use thiserror::Error;
 use log::{error, debug, info, warn};
 use sha2::{Sha256, Digest};
-use pdf_extract::extract_text as pdf_extract_text;
 use serde::{Serialize, Deserialize};
 
 #[derive(Error, Debug)]

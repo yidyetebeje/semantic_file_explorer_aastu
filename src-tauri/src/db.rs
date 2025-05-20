@@ -12,16 +12,20 @@ use tempfile::TempDir; // Add this line for temporary directory support
 use thiserror::Error;
 use chrono::Utc;
 use log::{info, warn, debug};
+
 use lance_arrow::FixedSizeListArrayExt;
 pub const TEXT_TABLE_NAME: &str = "documents";
 pub const IMAGE_TABLE_NAME: &str = "images";
 pub const TEXT_EMBEDDING_DIM: i32 = 384;  // BGESmallENV15 dimension
 pub const IMAGE_EMBEDDING_DIM: i32 = 768; // NomicEmbedVisionV15 dimension
+pub const AMHARIC_TEXT_TABLE_NAME: &str = "amharic_documents";
+pub const AMHARIC_EMBEDDING_DIM: i32 = 384; // Dimension for multilingual-e5-small
+
+pub const APP_DATA_DIR_NAME: &str = "semantic_file_explorer";
 
 // For backward compatibility - use existing constant names internally
 pub const TABLE_NAME: &str = TEXT_TABLE_NAME;
 pub const EMBEDDING_DIM: i32 = TEXT_EMBEDDING_DIM;
-pub const APP_DATA_DIR_NAME: &str = "semantic_file_explorer";
 
 #[derive(Error, Debug)]
 pub enum DbError {
@@ -53,33 +57,34 @@ pub enum DbError {
     ImageEmbeddingError(#[from] crate::image_embedder::ImageEmbeddingError),
 }
 
-/// Returns the path to the application's data directory where LanceDB files will be stored
-/// 
-/// On macOS, this will be: ~/Library/Application Support/semantic_file_explorer/lancedb
-/// 
-/// The directory will be created if it doesn't exist.
 pub fn get_db_path() -> Result<PathBuf, DbError> {
-    // Get the user's application support directory
     let app_data_dir = dirs::config_dir()
         .or_else(|| dirs::data_local_dir())
         .ok_or_else(|| DbError::AppDataDirError("Failed to locate application data directory".to_string()))?;
-    
-    // Create the specific folder for our app
     let db_dir = app_data_dir.join(APP_DATA_DIR_NAME).join("lancedb");
-    
-    // Create the directory if it doesn't exist
     if !db_dir.exists() {
-        info!("Creating database directory: {}", db_dir.display());
-        fs::create_dir_all(&db_dir).map_err(|e| {
-            DbError::IoError(db_dir.display().to_string(), e)
-        })?;
+        fs::create_dir_all(&db_dir).map_err(|e| DbError::IoError(db_dir.display().to_string(), e))?;
     }
-    
-    info!("Using database directory: {}", db_dir.display());
     Ok(db_dir)
 }
 
-/// Create the schema for text embeddings table (documents)
+fn create_amharic_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("file_path", DataType::Utf8, false),
+        Field::new("content_hash", DataType::Utf8, false),
+        Field::new("chunk_id", DataType::Int32, false),
+        Field::new(
+            "embedding",
+            DataType::FixedSizeList(
+                Arc::new(Field::new("item", DataType::Float32, true)),
+                AMHARIC_EMBEDDING_DIM,
+            ),
+            true,
+        ),
+        Field::new("last_modified", DataType::Timestamp(TimeUnit::Second, None), false),
+    ]))
+}
+
 fn create_text_schema() -> SchemaRef {
     Arc::new(Schema::new(vec![
         Field::new("file_path", DataType::Utf8, false),
@@ -93,11 +98,7 @@ fn create_text_schema() -> SchemaRef {
             ),
             true,
         ),
-        Field::new(
-            "last_modified",
-            DataType::Timestamp(TimeUnit::Second, None),
-            false,
-        ),
+        Field::new("last_modified", DataType::Timestamp(TimeUnit::Second, None), false),
     ]))
 }
 
@@ -124,11 +125,6 @@ fn create_image_schema() -> SchemaRef {
         Field::new("height", DataType::Int32, true),     // Image height in pixels
         Field::new("thumbnail_path", DataType::Utf8, true),  // Path to thumbnail if generated
     ]))
-}
-
-// Add backward compatibility function
-fn create_schema() -> SchemaRef {
-    create_text_schema()
 }
 
 pub async fn connect_db() -> Result<Connection, DbError> {
@@ -177,6 +173,12 @@ pub async fn open_or_create_image_table(
     conn: &Connection,
 ) -> Result<Table, DbError> {
     open_or_create_table_with_schema(conn, IMAGE_TABLE_NAME, create_image_schema()).await
+}
+
+pub async fn open_or_create_amharic_text_table(
+    conn: &Connection,
+) -> Result<Table, DbError> {
+    open_or_create_table_with_schema(conn, AMHARIC_TEXT_TABLE_NAME, create_amharic_schema()).await
 }
 
 /// Generic function to open or create a table with a specific schema
@@ -277,7 +279,7 @@ pub async fn upsert_document(
         let mut embedding_builder = Float32Builder::new();
         embedding_builder.append_slice(embedding);
         let values_array = Arc::new(embedding_builder.finish()) as Arc<dyn arrow_array::Array>;
-        let embedding_array = FixedSizeListArray::try_new_from_values(values_array, EMBEDDING_DIM)
+        let embedding_array = FixedSizeListArray::try_new_from_values(values_array, TEXT_EMBEDDING_DIM)
             .expect("Failed to create FixedSizeListArray");
 
         // Create the RecordBatch
@@ -300,6 +302,66 @@ pub async fn upsert_document(
     table.add(Box::new(reader)).execute().await?; // Map LanceError via From
 
     debug!("Successfully upserted document: {} with {} chunks", file_path, embeddings.len());
+    Ok(())
+}
+
+pub async fn upsert_amharic_document(
+    table: &Table,
+    file_path: &str,
+    content_hash: &str,
+    embeddings: &[Vec<f32>],
+) -> Result<(), DbError> {
+    if embeddings.is_empty() {
+        warn!("No embeddings provided for {}, skipping upsert", file_path);
+        return Ok(());
+    }
+
+    debug!("Upserting Amharic document: {} with {} chunks", file_path, embeddings.len());
+    
+    // 1. Delete existing entries for this file path (ignore error if not found)
+    let _ = delete_document(table, file_path).await; // Allow delete to fail if not present
+
+    // 2. Prepare the new record batches
+    let schema = create_amharic_schema(); // Get the schema
+    let now_ts = Utc::now().timestamp();
+
+    // Create batches for all embeddings/chunks
+    let mut batches = Vec::with_capacity(embeddings.len());
+    
+    for (i, embedding) in embeddings.iter().enumerate() {
+        // Create Arrow arrays for each record
+        let file_path_array = StringArray::from(vec![file_path]);
+        let content_hash_array = StringArray::from(vec![content_hash]);
+        let chunk_id_array = Int32Array::from(vec![i as i32]);
+        let last_modified_array = TimestampSecondArray::from(vec![now_ts]);
+
+        // Create the FixedSizeList array for the embedding
+        let mut embedding_builder = Float32Builder::new();
+        embedding_builder.append_slice(embedding);
+        let values_array = Arc::new(embedding_builder.finish()) as Arc<dyn arrow_array::Array>;
+        let embedding_array = FixedSizeListArray::try_new_from_values(values_array, AMHARIC_EMBEDDING_DIM)
+            .expect("Failed to create FixedSizeListArray");
+
+        // Create the RecordBatch
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(file_path_array),
+                Arc::new(content_hash_array),
+                Arc::new(chunk_id_array),
+                Arc::new(embedding_array),
+                Arc::new(last_modified_array),
+            ],
+        ).map_err(|e| DbError::SchemaError(e))?; // Convert ArrowError to DbError
+        
+        batches.push(Ok(batch));
+    }
+
+    // 3. Add all record batches to the table
+    let reader = RecordBatchIterator::new(batches, schema);
+    table.add(Box::new(reader)).execute().await?; // Map LanceError via From
+
+    debug!("Successfully upserted Amharic document: {} with {} chunks", file_path, embeddings.len());
     Ok(())
 }
 
@@ -552,12 +614,13 @@ pub async fn clear_data(conn: &Connection, table_name: &str) -> Result<(), DbErr
 }
 
 /// Gets statistics about the vector database, including document counts for each table
-pub async fn get_vector_db_stats(conn: &Connection) -> Result<(usize, usize), DbError> {
+pub async fn get_vector_db_stats(conn: &Connection) -> Result<(usize, usize, usize), DbError> {
     info!("Getting vector database statistics");
     
     // Initialize document counts
     let mut text_docs_count = 0;
     let mut image_docs_count = 0;
+    let mut amharic_docs_count = 0;
     
     // Try to get text documents count
     match conn.open_table(TEXT_TABLE_NAME).execute().await {
@@ -628,7 +691,36 @@ pub async fn get_vector_db_stats(conn: &Connection) -> Result<(usize, usize), Db
             // Continue with zero count
         }
     }
+
+    // Try to get Amharic text documents count
+    match conn.open_table(AMHARIC_TEXT_TABLE_NAME).execute().await {
+        Ok(table) => {
+            let result = table.query().select(Select::All).execute().await;
+            match result {
+                Ok(data) => {
+                    let count = match data.try_collect::<Vec<_>>().await {
+                        Ok(batches) => {
+                            let total = batches.iter().map(|batch| batch.num_rows()).sum();
+                            debug!("Amharic text documents count: {}", total);
+                            total
+                        },
+                        Err(e) => {
+                            warn!("Error counting Amharic text documents: {}", e);
+                            0
+                        }
+                    };
+                    amharic_docs_count = count;
+                },
+                Err(e) => {
+                    warn!("Error counting Amharic text documents: {}", e);
+                }
+            }
+        },
+        Err(e) => {
+            debug!("Amharic text table not found or cannot be opened: {}", e);
+        }
+    }
     
     // Return the document counts
-    Ok((text_docs_count, image_docs_count))
+    Ok((text_docs_count, image_docs_count, amharic_docs_count))
 }

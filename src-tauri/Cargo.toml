@@ -87,6 +87,7 @@ lance-arrow = "0.10.16" # Explicitly add version used by lancedb
 text-splitter = "0.25.1"
 lopdf = "0.36.0"
 extractous = "0.3.0"
+whatlang = "0.16.0" # For language detection
 
 [features]
 # By default Tauri runs in production mode

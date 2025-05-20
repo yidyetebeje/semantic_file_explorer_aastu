@@ -5,16 +5,12 @@ use crate::extractor::ContentType;
 // use crate::filename_index::{ThreadSafeIndex, FilenameSearchResult, FileCategory, FilenameIndexError};
 use log::{info, error, warn, debug};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use lancedb::query::ExecutableQuery;
 use futures_util::stream::TryStreamExt;
 // HashSet removed - not used
 use std::path::{PathBuf};
-use once_cell::sync::Lazy;
-use std::fs::{self, metadata, create_dir_all};
-use walkdir::WalkDir;
-use tokio::task;
-use directories::ProjectDirs; // Use the new 'directories' crate
+use std::fs::{metadata};
+ // Use the new 'directories' crate
 use dirs; // Add the dirs crate for home_dir()
 
 // Using rust_search for filename search. Tantivy imports removed.
@@ -22,7 +18,7 @@ use rust_search::SearchBuilder;
 use std::path::Path; // Only import Path, not PathBuf again
 use shellexpand; // For tilde path expansion
 // Removed duplicate import of metadata
-use directories; // For user directories (already a dependency, ensure consistent use)
+ // For user directories (already a dependency, ensure consistent use)
 // Tantivy-specific structs (FilenameSchema), statics (TANTIVY_SCHEMA, TANTIVY_INDEX),
 // and helper functions (get_index) have been removed as rust_search operates on the live filesystem.
 
