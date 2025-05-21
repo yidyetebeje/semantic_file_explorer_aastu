@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Represents information about a file or directory entry.
 /// Derives Ord for easy sorting in tests (uses name as primary sort key).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct FileInfo {
     pub name: String,
     pub path: String,

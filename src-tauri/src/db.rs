@@ -1,6 +1,6 @@
 // src-tauri/src/db.rs
 
-use arrow_array::{RecordBatch, RecordBatchIterator, StringArray, FixedSizeListArray, TimestampSecondArray, Int32Array, Float32Array};
+use arrow_array::{RecordBatch, RecordBatchIterator, StringArray, FixedSizeListArray, TimestampSecondArray, Int32Array, Float32Array, Array};
 use arrow_array::builder::Float32Builder;
 use arrow_schema::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use lancedb::{connection::Connection, table::Table, Error as LanceError};
@@ -749,7 +749,7 @@ pub async fn get_all_indexed_files_with_embeddings(conn: &Connection) -> Result<
                     let path_str = file_path_arr.value(i).to_string();
                     let name = PathBuf::from(&path_str).file_name().unwrap_or_default().to_string_lossy().into_owned();
                     
-                    let embedding_values_data = embedding_arr.values(i);
+                    let embedding_values_data = embedding_arr.value(i);
                     let embedding_values = embedding_values_data.as_any().downcast_ref::<Float32Array>().unwrap();
                     let embedding_vec: Vec<f32> = embedding_values.values().iter().copied().collect();
 
@@ -789,7 +789,7 @@ pub async fn get_all_indexed_files_with_embeddings(conn: &Connection) -> Result<
                     let path_str = file_path_arr.value(i).to_string();
                     let name = PathBuf::from(&path_str).file_name().unwrap_or_default().to_string_lossy().into_owned();
                     
-                    let embedding_values_data = embedding_arr.values(i);
+                    let embedding_values_data = embedding_arr.value(i);
                     let embedding_values = embedding_values_data.as_any().downcast_ref::<Float32Array>().unwrap();
                     let embedding_vec: Vec<f32> = embedding_values.values().iter().copied().collect();
 
@@ -800,7 +800,7 @@ pub async fn get_all_indexed_files_with_embeddings(conn: &Connection) -> Result<
                         size: None, 
                         modified: Some(DateTime::from_timestamp(last_modified_arr.value(i), 0).unwrap_or_else(|| Utc::now())),
                         file_type: "Image".to_string(), // Simplified
-                        thumbnail_path: thumbnail_path_arr.map(|arr| if arr.is_valid(i) { Some(arr.value(i).to_string()) } else { None }).flatten(),
+                        thumbnail_path: thumbnail_path_arr.map(|arr| if !arr.is_null(i) { Some(arr.value(i).to_string()) } else { None }).flatten(),
                         embedding: Some(embedding_vec),
                     });
                 }

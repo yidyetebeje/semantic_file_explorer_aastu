@@ -1,39 +1,61 @@
 // src-tauri/src/commands/chat_commands.rs
 
 use serde_json::Value;
-use tauri::State;
-use crate::core::models::SemanticSearchResult;
-use crate::search::search_files_semantic;
-use crate::commands::search_commands::{filename_search_command, semantic_search_command};
+use tauri::WebviewWindow;
+use crate::commands::search_commands::{filename_search_command, semantic_search_command, SearchRequest, FilenameSearchRequest};
 
 
 #[tauri::command]
-pub async fn send_message_to_gemini(app_handle: tauri::AppHandle, message: String) -> Result<String, String> {
+pub async fn send_message_to_gemini(window: WebviewWindow, message: String) -> Result<String, String> {
     let script = format!("window.sendToGemini(`{}`)", message);
-    match app_handle.eval_script(&script).await {
-        Ok(tauri::ipc::Response::Ok(value)) => {
-            // Assuming the JS promise resolves to a string which gets serialized as a JSON string
-            if let Some(response_str) = value.as_str() {
-                Ok(response_str.to_string())
-            } else {
-                Err(format!("Unexpected JS response type: {:?}", value))
-            }
+    match window.eval(&script) {
+        Ok(_) => {
+            // In Tauri v2, eval returns () on success, not a value
+            // We'll need to handle the actual response through callbacks or events
+            Ok("Message sent to Gemini".to_string())
         }
-        Ok(tauri::ipc::Response::Err(err)) => Err(format!("JS error: {:?}", err)),
         Err(e) => Err(format!("Failed to evaluate script: {}", e)),
     }
 }
 
 #[tauri::command]
 pub async fn search_files(query: String) -> Result<Value, String> {
-    let semantic_results_future = semantic_search_command(query.clone(), None, None, None, None);
-    let filename_results_future = filename_search_command(query.clone(), None, None, None);
+    // Create proper request objects
+    let semantic_request = SearchRequest {
+        query: query.clone(),
+        limit: None,
+        min_score: None,
+        db_uri: None,
+        content_type: None
+    };
+    
+    let filename_request = FilenameSearchRequest {
+        query: query.clone(),
+        categories: None,
+        limit: None,
+        path_filter: None,
+        category_filter: None
+    };
+    
+    let semantic_results_future = semantic_search_command(semantic_request);
+    let filename_results_future = filename_search_command(filename_request);
 
     let (semantic_results, filename_results) = tokio::join!(semantic_results_future, filename_results_future);
 
+    // Map the results to JSON value format
+    let semantic_search_json = match semantic_results {
+        Ok(response) => serde_json::to_value(response).unwrap_or_else(|e| serde_json::json!({"error": e.to_string()})),
+        Err(e) => serde_json::json!({"error": e}),
+    };
+    
+    let filename_search_json = match filename_results {
+        Ok(response) => serde_json::to_value(response).unwrap_or_else(|e| serde_json::json!({"error": e.to_string()})),
+        Err(e) => serde_json::json!({"error": e}),
+    };
+    
     let combined_results = serde_json::json!({
-        "semantic_search": semantic_results.unwrap_or_else(|e| serde_json::json!({"error": e.to_string()})),
-        "filename_search": filename_results.unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}))
+        "semantic_search": semantic_search_json,
+        "filename_search": filename_search_json
     });
 
     Ok(combined_results)

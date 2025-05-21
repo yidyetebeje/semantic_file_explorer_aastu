@@ -142,6 +142,7 @@ pub async fn list_directory(
                             modified,
                             file_type,
                             thumbnail_path, // Add the thumbnail path
+                            embedding: None, // No embedding for directory listings
                         });
                     }
                     Err(e) => {
@@ -169,8 +170,8 @@ pub async fn list_directory(
         }
     }
 
-    // 4. Sort results (no change here, relies on Ord derived for FileInfo)
-    results.sort();
+    // 4. Sort results by name (since FileInfo no longer implements Ord)
+    results.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(results)
 }
