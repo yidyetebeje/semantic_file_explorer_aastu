@@ -19,6 +19,47 @@ interface SearchResultItemProps {
 export const SearchResultItem: React.FC<SearchResultItemProps> = ({ result, type }) => {
   const setMessages = useSetAtom(chatMessagesAtom);
 
+  // Helper function to add messages, can be outside if preferred and setMessages is passed
+  const addChatMessageHelper = (
+    text: string,
+    sender: 'user' | 'bot' | 'system',
+    metadata?: any 
+  ) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString() + Math.random().toString(36).substring(2,7), // More unique ID
+        text,
+        sender,
+        timestamp: new Date(),
+        metadata,
+      },
+    ]);
+  };
+
+  const handleSummarizeClickInternal = () => {
+    addChatMessageHelper(
+      `Summarizing file: "${result.name}"...`,
+      'system'
+    );
+
+    invoke<string>('summarize_file', { filePath: result.file_path })
+      .then(summary => {
+        addChatMessageHelper(
+          `Summary for ${result.name}:\n${summary}`,
+          'bot',
+          { isSummary: true, filePath: result.file_path } 
+        );
+      })
+      .catch(error => {
+        console.error(`Error summarizing file ${result.name}:`, error);
+        addChatMessageHelper(
+          `Error summarizing file "${result.name}": ${error}`,
+          'system'
+        );
+      });
+  };
+
   const handleResultClick = async () => {
     setMessages(prev => [
       ...prev,
@@ -63,9 +104,56 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({ result, type
       <p className="text-sm font-medium">{result.name}</p>
       <p className="text-xs text-gray-500 dark:text-gray-400">{result.file_path}</p>
       {result.score && <p className="text-xs">Score: {result.score.toFixed(4)} ({type})</p>}
-      <Button variant="link" size="sm" onClick={handleResultClick} className="p-0 h-auto text-xs">
+      <Button variant="link" size="sm" onClick={handleResultClick} className="p-0 h-auto text-xs mr-2">
         View Content
+      </Button>
+      <Button variant="link" size="sm" onClick={handleSummarizeClickInternal} className="p-0 h-auto text-xs mr-2">
+        Summarize
+      </Button>
+      <Button variant="link" size="sm" onClick={handleOpenFileClick} className="p-0 h-auto text-xs mr-2">
+        Open File
+      </Button>
+      <Button variant="link" size="sm" onClick={handleCopyPathClick} className="p-0 h-auto text-xs">
+        Copy Path
       </Button>
     </div>
   );
+
+  function handleOpenFileClick() {
+    addChatMessageHelper(
+      `Attempting to open: "${result.name}"...`,
+      'system'
+    );
+    invoke<void>('open_file_external', { path: result.file_path })
+      .then(() => {
+        addChatMessageHelper(
+          `Successfully requested to open "${result.name}". Check your system.`,
+          'system'
+        );
+      })
+      .catch(error => {
+        console.error(`Error opening file ${result.name}:`, error);
+        addChatMessageHelper(
+          `Error opening file "${result.name}": ${error}`,
+          'system'
+        );
+      });
+  }
+
+  function handleCopyPathClick() {
+    invoke<void>('copy_to_clipboard', { text: result.file_path })
+      .then(() => {
+        addChatMessageHelper(
+          `Path for "${result.name}" copied to clipboard.`,
+          'system'
+        );
+      })
+      .catch(error => {
+        console.error(`Error copying path for ${result.name}:`, error);
+        addChatMessageHelper(
+          `Error copying path for "${result.name}": ${error}`,
+          'system'
+        );
+      });
+  }
 };

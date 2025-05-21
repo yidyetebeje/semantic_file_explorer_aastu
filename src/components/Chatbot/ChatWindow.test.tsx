@@ -235,4 +235,102 @@ describe('ChatWindow', () => {
     expect(lastMessage.sender).toBe('system');
     expect(lastMessage.text).toContain('Error searching files: Search Failed');
   });
+
+  // Tests for /summarize command
+  test('sends /summarize command and displays success message', async () => {
+    const filePath = '/path/to/document.txt';
+    const summaryText = 'This is a summary of the document.';
+    mockInvoke.mockResolvedValueOnce(summaryText); // Mock for summarize_file
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      if (typeof fn === 'function') currentMessages = fn(currentMessages); else currentMessages = fn;
+    });
+    mockUseAtom.mockImplementation((atom) => {
+      if (atom === chatMessagesAtom) return [currentMessages, mockSetMessages];
+      if (atom === chatInputAtom) return [`/summarize ${filePath}`, mockSetInput];
+      if (atom === isChatOpenAtom) return [true, mockSetIsOpen];
+      return [undefined, vi.fn()];
+    });
+
+    render(<ChatWindow />);
+    fireEvent.click(screen.getByRole('button')); // Send button
+
+    // 1. User message
+    // 2. System message "Summarizing file..."
+    // 3. Bot message with summary
+    
+    expect(mockInvoke).toHaveBeenCalledWith('summarize_file', { filePath });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(3));
+
+    const userMessage = currentMessages.find(msg => msg.sender === 'user' && msg.text === `/summarize ${filePath}`);
+    const systemMessage = currentMessages.find(msg => msg.sender === 'system' && msg.text.includes(`Summarizing file: "${filePath}"`));
+    const botMessage = currentMessages.find(msg => msg.sender === 'bot' && msg.text.includes(summaryText));
+
+    expect(userMessage).toBeDefined();
+    expect(systemMessage).toBeDefined();
+    expect(botMessage).toBeDefined();
+    expect(botMessage?.metadata?.isSummary).toBe(true);
+  });
+
+  test('sends /summarize command and displays error message on failure', async () => {
+    const filePath = '/path/to/error_document.txt';
+    const errorMessage = 'Could not summarize the document.';
+    mockInvoke.mockRejectedValueOnce(errorMessage); // Mock for summarize_file failure
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      if (typeof fn === 'function') currentMessages = fn(currentMessages); else currentMessages = fn;
+    });
+    mockUseAtom.mockImplementation((atom) => {
+      if (atom === chatMessagesAtom) return [currentMessages, mockSetMessages];
+      if (atom === chatInputAtom) return [`/summarize ${filePath}`, mockSetInput];
+      if (atom === isChatOpenAtom) return [true, mockSetIsOpen];
+      return [undefined, vi.fn()];
+    });
+
+    render(<ChatWindow />);
+    fireEvent.click(screen.getByRole('button')); // Send button
+
+    // 1. User message
+    // 2. System message "Summarizing file..."
+    // 3. System message with error
+    expect(mockInvoke).toHaveBeenCalledWith('summarize_file', { filePath });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(3));
+    
+    const userMessage = currentMessages.find(msg => msg.sender === 'user' && msg.text === `/summarize ${filePath}`);
+    const systemSummarizingMessage = currentMessages.find(msg => msg.sender === 'system' && msg.text.includes(`Summarizing file: "${filePath}"`));
+    const systemErrorMessage = currentMessages.find(msg => msg.sender === 'system' && msg.text.includes(`Error summarizing file "${filePath}": ${errorMessage}`));
+
+    expect(userMessage).toBeDefined();
+    expect(systemSummarizingMessage).toBeDefined();
+    expect(systemErrorMessage).toBeDefined();
+  });
+
+  test('/summarize command with no file path shows usage message', async () => {
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      if (typeof fn === 'function') currentMessages = fn(currentMessages); else currentMessages = fn;
+    });
+    mockUseAtom.mockImplementation((atom) => {
+      if (atom === chatMessagesAtom) return [currentMessages, mockSetMessages];
+      if (atom === chatInputAtom) return ['/summarize ', mockSetInput]; // Empty file path
+      if (atom === isChatOpenAtom) return [true, mockSetIsOpen];
+      return [undefined, vi.fn()];
+    });
+
+    render(<ChatWindow />);
+    fireEvent.click(screen.getByRole('button'));
+
+    // 1. User message
+    // 2. System message with usage information
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(2));
+    expect(mockInvoke).not.toHaveBeenCalledWith('summarize_file', expect.anything());
+    
+    const userMessage = currentMessages.find(msg => msg.sender === 'user' && msg.text === '/summarize ');
+    const systemMessage = currentMessages.find(msg => msg.sender === 'system' && msg.text === 'Usage: /summarize <file_path>');
+    
+    expect(userMessage).toBeDefined();
+    expect(systemMessage).toBeDefined();
+  });
 });

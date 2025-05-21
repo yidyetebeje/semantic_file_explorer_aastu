@@ -36,6 +36,10 @@ describe('SearchResultItem', () => {
     expect(screen.getByText(mockResult.file_path)).toBeInTheDocument();
     expect(screen.getByText(`Score: ${mockResult.score.toFixed(4)} (semantic)`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'View Content' })).toBeInTheDocument();
+    // Verify new buttons are rendered
+    expect(screen.getByRole('button', { name: 'Summarize' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open File' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Path' })).toBeInTheDocument();
   });
 
   test('calls get_document_content and updates messages on "View Content" click', async () => {
@@ -89,5 +93,120 @@ describe('SearchResultItem', () => {
       // "Fetching..." message, then error message
       expect(mockSetMessages).toHaveBeenCalledTimes(2); 
     });
+  });
+
+  // --- Tests for Summarize button ---
+  test('"Summarize" button click invokes summarize_file and updates messages on success', async () => {
+    const summaryText = "This is a summary.";
+    mockInvoke.mockResolvedValueOnce(summaryText); // For summarize_file
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      currentMessages = typeof fn === 'function' ? fn(currentMessages) : fn;
+    });
+
+    render(<SearchResultItem result={mockResult} type="semantic" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }));
+
+    expect(mockInvoke).toHaveBeenCalledWith('summarize_file', { filePath: mockResult.file_path });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(2)); // "Summarizing..." and actual summary
+
+    expect(currentMessages.find(msg => msg.text.includes(`Summarizing file: "${mockResult.name}"`))).toBeDefined();
+    const summaryMessage = currentMessages.find(msg => msg.sender === 'bot' && msg.text.includes(summaryText));
+    expect(summaryMessage).toBeDefined();
+    expect(summaryMessage?.metadata?.isSummary).toBe(true);
+  });
+
+  test('"Summarize" button click handles error from summarize_file', async () => {
+    const errorMsg = "Failed to summarize";
+    mockInvoke.mockRejectedValueOnce(errorMsg); // For summarize_file
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      currentMessages = typeof fn === 'function' ? fn(currentMessages) : fn;
+    });
+
+    render(<SearchResultItem result={mockResult} type="semantic" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }));
+
+    expect(mockInvoke).toHaveBeenCalledWith('summarize_file', { filePath: mockResult.file_path });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(2)); // "Summarizing..." and error
+
+    expect(currentMessages.find(msg => msg.text.includes(`Summarizing file: "${mockResult.name}"`))).toBeDefined();
+    expect(currentMessages.find(msg => msg.text.includes(`Error summarizing file "${mockResult.name}": ${errorMsg}`))).toBeDefined();
+  });
+
+  // --- Tests for Open File button ---
+  test('"Open File" button click invokes open_file_external and updates messages on success', async () => {
+    mockInvoke.mockResolvedValueOnce(undefined); // For open_file_external
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      currentMessages = typeof fn === 'function' ? fn(currentMessages) : fn;
+    });
+
+    render(<SearchResultItem result={mockResult} type="semantic" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open File' }));
+
+    expect(mockInvoke).toHaveBeenCalledWith('open_file_external', { path: mockResult.file_path });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(2)); // "Attempting to open..." and success/error
+
+    expect(currentMessages.find(msg => msg.text.includes(`Attempting to open: "${mockResult.name}"`))).toBeDefined();
+    expect(currentMessages.find(msg => msg.text.includes(`Successfully requested to open "${mockResult.name}"`))).toBeDefined();
+  });
+
+  test('"Open File" button click handles error from open_file_external', async () => {
+    const errorMsg = "Cannot open";
+    mockInvoke.mockRejectedValueOnce(errorMsg); // For open_file_external
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      currentMessages = typeof fn === 'function' ? fn(currentMessages) : fn;
+    });
+    
+    render(<SearchResultItem result={mockResult} type="semantic" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open File' }));
+
+    expect(mockInvoke).toHaveBeenCalledWith('open_file_external', { path: mockResult.file_path });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(2));
+
+    expect(currentMessages.find(msg => msg.text.includes(`Attempting to open: "${mockResult.name}"`))).toBeDefined();
+    expect(currentMessages.find(msg => msg.text.includes(`Error opening file "${mockResult.name}": ${errorMsg}`))).toBeDefined();
+  });
+
+  // --- Tests for Copy Path button ---
+  test('"Copy Path" button click invokes copy_to_clipboard and updates messages on success', async () => {
+    mockInvoke.mockResolvedValueOnce(undefined); // For copy_to_clipboard
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      currentMessages = typeof fn === 'function' ? fn(currentMessages) : fn;
+    });
+
+    render(<SearchResultItem result={mockResult} type="semantic" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Path' }));
+
+    expect(mockInvoke).toHaveBeenCalledWith('copy_to_clipboard', { text: mockResult.file_path });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(1)); // Only one message for copy path
+
+    expect(currentMessages.find(msg => msg.text.includes(`Path for "${mockResult.name}" copied to clipboard.`))).toBeDefined();
+  });
+
+  test('"Copy Path" button click handles error from copy_to_clipboard', async () => {
+    const errorMsg = "Clipboard fail";
+    mockInvoke.mockRejectedValueOnce(errorMsg); // For copy_to_clipboard
+
+    let currentMessages: ChatMessage[] = [];
+    mockSetMessages.mockImplementation((fn) => {
+      currentMessages = typeof fn === 'function' ? fn(currentMessages) : fn;
+    });
+
+    render(<SearchResultItem result={mockResult} type="semantic" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Path' }));
+
+    expect(mockInvoke).toHaveBeenCalledWith('copy_to_clipboard', { text: mockResult.file_path });
+    await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(1));
+
+    expect(currentMessages.find(msg => msg.text.includes(`Error copying path for "${mockResult.name}": ${errorMsg}`))).toBeDefined();
   });
 });

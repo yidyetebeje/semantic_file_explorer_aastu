@@ -28,8 +28,6 @@ export const ChatWindow: React.FC = () => {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: `Searching for: "${query}"`, sender: 'system', timestamp: new Date() }]);
       invoke<any>('search_files', { query }) // Expecting JSON response
         .then(results => {
-          // Add a message to display search results
-          // This will be improved later to show structured results
           setMessages(prev => [
             ...prev,
             { 
@@ -37,7 +35,7 @@ export const ChatWindow: React.FC = () => {
               text: "Search results:", 
               sender: 'system', 
               timestamp: new Date(),
-              metadata: { searchResults: results } // Store raw results for now
+              metadata: { searchResults: results }
             }
           ]);
         })
@@ -46,6 +44,28 @@ export const ChatWindow: React.FC = () => {
           setMessages(prev => [
             ...prev,
             { id: (Date.now() + 2).toString(), text: `Error searching files: ${error}`, sender: 'system', timestamp: new Date() }
+          ]);
+        });
+    } else if (input.startsWith('/summarize ')) {
+      const filePath = input.substring('/summarize '.length).trim();
+      if (filePath === '') {
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: "Usage: /summarize <file_path>", sender: 'system', timestamp: new Date() }]);
+        return;
+      }
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: `Summarizing file: "${filePath}"...`, sender: 'system', timestamp: new Date() }]);
+      
+      invoke<string>('summarize_file', { filePath })
+        .then(summary => {
+          setMessages(prev => [
+            ...prev,
+            { id: (Date.now() + 2).toString(), text: `Summary for ${filePath}:\n${summary}`, sender: 'bot' as const, timestamp: new Date(), metadata: {isSummary: true} }
+          ]);
+        })
+        .catch(error => {
+          console.error(`Error summarizing file ${filePath}:`, error);
+          setMessages(prev => [
+            ...prev,
+            { id: (Date.now() + 2).toString(), text: `Error summarizing file "${filePath}": ${error}`, sender: 'system', timestamp: new Date() }
           ]);
         });
     } else {
@@ -81,7 +101,7 @@ export const ChatWindow: React.FC = () => {
           if (msg.metadata?.searchResults) {
             const { semantic_search, filename_search } = msg.metadata.searchResults;
             return (
-              <div key={msg.id} className="mb-3 p-3 rounded-lg bg-gray-100 dark:bg-gray-700 w-full">
+              <div key={msg.id} className="mb-3 p-3 rounded-lg bg-gray-100 dark:bg-gray-700 w-full text-gray-900 dark:text-white">
                 <p className="text-sm font-semibold mb-2">{msg.text}</p>
                 {semantic_search?.results && semantic_search.results.length > 0 && (
                   <>
@@ -115,8 +135,10 @@ export const ChatWindow: React.FC = () => {
               className={`mb-3 p-3 rounded-lg max-w-[80%] ${
                 msg.sender === 'user'
                   ? 'bg-blue-500 text-white self-end ml-auto'
-                  : msg.sender === 'bot' 
-                  ? 'bg-green-500 text-white self-start mr-auto' // Differentiate bot messages
+                : msg.sender === 'bot'
+                  ? msg.metadata?.isSummary // Check for summary metadata
+                    ? 'bg-purple-600 text-white self-start mr-auto' // Dedicated summary style
+                    : 'bg-green-500 text-white self-start mr-auto' // Regular bot message
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white self-start mr-auto' // System messages
               }`}
             >

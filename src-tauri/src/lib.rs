@@ -6,6 +6,7 @@ use commands::fs_commands::{
 };
 use commands::file_operations::{
     copy_item, create_directory, delete_item, get_item_info, move_item, rename_item,
+    copy_to_clipboard, open_file_external, // Added new commands
 };
 use commands::indexing_commands::{
     clear_index_command, get_indexing_stats_command, get_vector_db_stats_command,
@@ -17,7 +18,7 @@ use commands::search_commands::{
 };
 use commands::search_commands::{get_document_count, semantic_search_command};
 use commands::env_commands::get_gemini_api_key;
-use commands::chat_commands::{send_message_to_gemini, search_files, get_document_content};
+use commands::chat_commands::{send_message_to_gemini, search_files, get_document_content, summarize_file}; // Added summarize_file
 use commands::category_commands::{get_all_categories, get_files_by_category};
 pub mod benchmark;
 pub mod chunker;
@@ -116,6 +117,8 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         rename_item,
         create_directory,
         get_item_info,
+        copy_to_clipboard, // Added new command
+        open_file_external, // Added new command
         // Database repair command
         repair_database_command,
         // Env command
@@ -124,6 +127,7 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         send_message_to_gemini,
         search_files,
         get_document_content,
+        summarize_file, // Added summarize_file
         // Category commands
         get_all_categories,
         get_files_by_category
